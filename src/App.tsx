@@ -102,6 +102,7 @@ function App() {
   const [proposalForm, setProposalForm] = useState(initialProposalForm);
   const [sessionForm, setSessionForm] = useState(initialSessionForm);
   const [targetEnd, setTargetEnd] = useState(initialState.targetEnd);
+  const [isScheduleViewOpen, setIsScheduleViewOpen] = useState(false);
 
   const schedule = useMemo(() => buildSchedule(agenda, sessionGroups), [agenda, sessionGroups]);
   const proposalsById = useMemo(
@@ -337,7 +338,6 @@ function App() {
             return {
               ...slot,
               proposalId,
-              talkDuration: proposal.preferredTalkDuration,
             };
           }),
         };
@@ -721,107 +721,181 @@ function App() {
               <p className="section-kicker">Agenda Builder</p>
               <h2>Session-based timeline</h2>
             </div>
-            <button className="primary-button" onClick={handleExport}>
-              Export schedule
-            </button>
-          </div>
-
-          <div className="settings-row">
-            <label>
-              Target end time
-              <input
-                type="time"
-                value={`${String(Math.floor(targetEnd / 60)).padStart(2, '0')}:${String(
-                  targetEnd % 60,
-                ).padStart(2, '0')}`}
-                onChange={handleTargetEndChange}
-              />
-            </label>
-          </div>
-
-          <div className="session-template-card">
-            <h3>Create session template</h3>
-            <div className="form-grid session-template-grid">
-              <label className="wide">
-                Session title
-                <input
-                  value={sessionForm.title}
-                  onChange={(event) => updateSessionForm('title', event.target.value)}
-                  placeholder="Research Session B"
-                />
-              </label>
-              <label>
-                Long talks (15)
-                <input
-                  type="number"
-                  min={0}
-                  value={sessionForm.longCount}
-                  onChange={(event) =>
-                    updateSessionForm('longCount', Number(event.target.value))
-                  }
-                />
-              </label>
-              <label>
-                Medium talks (10)
-                <input
-                  type="number"
-                  min={0}
-                  value={sessionForm.mediumCount}
-                  onChange={(event) =>
-                    updateSessionForm('mediumCount', Number(event.target.value))
-                  }
-                />
-              </label>
-              <label>
-                Short talks (5)
-                <input
-                  type="number"
-                  min={0}
-                  value={sessionForm.shortCount}
-                  onChange={(event) =>
-                    updateSessionForm('shortCount', Number(event.target.value))
-                  }
-                />
-              </label>
-              <label>
-                Transition between talks
-                <input
-                  type="number"
-                  min={0}
-                  value={sessionForm.transitionDuration}
-                  onChange={(event) =>
-                    updateSessionForm('transitionDuration', Number(event.target.value))
-                  }
-                />
-              </label>
-              <label>
-                Default Q&amp;A per talk
-                <input
-                  type="number"
-                  min={0}
-                  value={sessionForm.defaultQaDuration}
-                  onChange={(event) =>
-                    updateSessionForm('defaultQaDuration', Number(event.target.value))
-                  }
-                />
-              </label>
+            <div className="panel-actions">
+              <button
+                className="secondary-button"
+                onClick={() => setIsScheduleViewOpen((current) => !current)}
+              >
+                View Schedule
+              </button>
+              <button className="primary-button" onClick={handleExport}>
+                Export schedule
+              </button>
             </div>
-            <button className="primary-button" onClick={handleAddSessionGroup}>
-              Add session
-            </button>
-            <button className="secondary-button break-button" onClick={handleAddBreak}>
-              Add 15-minute break
-            </button>
-            <button
-              className="secondary-button break-button"
-              onClick={handleResetDefaultSchedule}
-            >
-              Reset to conference default
-            </button>
           </div>
 
-          <div className="timeline">
-            {schedule.map((item) => {
+          {isScheduleViewOpen ? (
+            <div className="schedule-table-wrapper">
+              <table className="schedule-table">
+                <thead>
+                  <tr>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th>Item</th>
+                    <th>Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {schedule.map((item) => {
+                    if (item.type === 'static') {
+                      return (
+                        <tr key={item.id}>
+                          <td>{formatTime(item.start)}</td>
+                          <td>{formatTime(item.end)}</td>
+                          <td>{item.title}</td>
+                          <td>
+                            {item.bufferBefore > 0 ? `Buffer before: ${item.bufferBefore} min` : ''}
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return (
+                      <tr key={item.id}>
+                        <td>{formatTime(item.start)}</td>
+                        <td>{formatTime(item.end)}</td>
+                        <td>{item.sessionGroup.title}</td>
+                        <td>
+                          <div className="schedule-session-details">
+                            {item.sessionGroup.slots.map((slot) => {
+                              const proposal = slot.proposalId
+                                ? proposalsById.get(slot.proposalId) ?? null
+                                : null;
+                              const slotLabel = getSlotLengthLabel(slot.talkDuration);
+                              return (
+                                <span className="session-detail-chip" key={slot.id}>
+                                  {slotLabel}: {proposal ? proposal.title : 'Unassigned'} ({slot.talkDuration}
+                                  {' + '}
+                                  {slot.qaDuration} Q&A)
+                                </span>
+                              );
+                            })}
+                            <span className="session-detail-meta">
+                              Transition: {item.sessionGroup.transitionDuration} min
+                            </span>
+                            {item.bufferBefore > 0 ? (
+                              <span className="session-detail-meta">
+                                Buffer before: {item.bufferBefore} min
+                              </span>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+
+          {!isScheduleViewOpen ? (
+            <>
+              <div className="settings-row">
+                <label>
+                  Target end time
+                  <input
+                    type="time"
+                    value={`${String(Math.floor(targetEnd / 60)).padStart(2, '0')}:${String(
+                      targetEnd % 60,
+                    ).padStart(2, '0')}`}
+                    onChange={handleTargetEndChange}
+                  />
+                </label>
+              </div>
+
+              <div className="session-template-card">
+                <h3>Create session template</h3>
+                <div className="form-grid session-template-grid">
+                  <label className="wide">
+                    Session title
+                    <input
+                      value={sessionForm.title}
+                      onChange={(event) => updateSessionForm('title', event.target.value)}
+                      placeholder="Research Session B"
+                    />
+                  </label>
+                  <label>
+                    Long talks (15)
+                    <input
+                      type="number"
+                      min={0}
+                      value={sessionForm.longCount}
+                      onChange={(event) =>
+                        updateSessionForm('longCount', Number(event.target.value))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Medium talks (10)
+                    <input
+                      type="number"
+                      min={0}
+                      value={sessionForm.mediumCount}
+                      onChange={(event) =>
+                        updateSessionForm('mediumCount', Number(event.target.value))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Short talks (5)
+                    <input
+                      type="number"
+                      min={0}
+                      value={sessionForm.shortCount}
+                      onChange={(event) =>
+                        updateSessionForm('shortCount', Number(event.target.value))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Transition between talks
+                    <input
+                      type="number"
+                      min={0}
+                      value={sessionForm.transitionDuration}
+                      onChange={(event) =>
+                        updateSessionForm('transitionDuration', Number(event.target.value))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Default Q&amp;A per talk
+                    <input
+                      type="number"
+                      min={0}
+                      value={sessionForm.defaultQaDuration}
+                      onChange={(event) =>
+                        updateSessionForm('defaultQaDuration', Number(event.target.value))
+                      }
+                    />
+                  </label>
+                </div>
+                <button className="primary-button" onClick={handleAddSessionGroup}>
+                  Add session
+                </button>
+                <button className="secondary-button break-button" onClick={handleAddBreak}>
+                  Add 15-minute break
+                </button>
+                <button
+                  className="secondary-button break-button"
+                  onClick={handleResetDefaultSchedule}
+                >
+                  Reset to conference default
+                </button>
+              </div>
+
+              <div className="timeline">
+                {schedule.map((item) => {
               if (item.type === 'static') {
                 return (
                   <div key={item.id}>
@@ -1135,8 +1209,10 @@ function App() {
                   </article>
                 </div>
               );
-            })}
-          </div>
+                })}
+              </div>
+            </>
+          ) : null}
         </section>
 
         <section className="panel summary-panel">

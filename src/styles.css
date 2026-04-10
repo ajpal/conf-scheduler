@@ -97,6 +97,12 @@ button {
   margin-bottom: 18px;
 }
 
+.panel-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .search-input {
   width: min(320px, 100%);
 }
@@ -316,6 +322,50 @@ textarea {
 
 .timeline {
   position: relative;
+}
+
+.schedule-table-wrapper {
+  overflow-x: auto;
+}
+
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.schedule-table th,
+.schedule-table td {
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid rgba(85, 68, 53, 0.12);
+}
+
+.schedule-table th {
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #7a6a5a;
+}
+
+.schedule-session-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.session-detail-chip,
+.session-detail-meta {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: rgba(239, 229, 215, 0.9);
+  color: #5e4f40;
+}
+
+.session-detail-meta {
+  background: rgba(231, 238, 234, 0.9);
 }
 
 .buffer-note {
