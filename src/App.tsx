@@ -544,6 +544,144 @@ function App() {
     URL.revokeObjectURL(url);
   }
 
+  function handleExportScheduleHtml() {
+    const rows = schedule
+      .map((item, index) => {
+        const nextItem = index < schedule.length - 1 ? schedule[index + 1] : null;
+        const displayEnd =
+          item.type === 'session' && nextItem ? nextItem.start : item.end;
+
+        if (item.type === 'static') {
+          return `
+            <tr>
+              <td>${escapeHtml(formatTime(item.start))}</td>
+              <td>${escapeHtml(formatTime(displayEnd))}</td>
+              <td>${escapeHtml(item.title)}</td>
+              <td></td>
+            </tr>
+          `;
+        }
+
+        const details = item.sessionGroup.slots
+          .map((slot) => {
+            const proposal = slot.proposalId ? proposalsById.get(slot.proposalId) ?? null : null;
+            const slotClass = getSlotLengthClass(slot.talkDuration);
+            const label = proposal
+              ? `${proposal.speakerName}: ${proposal.title}`
+              : 'Unassigned';
+            return `<div class="chip ${slotClass}">${escapeHtml(label)}</div>`;
+          })
+          .join('');
+
+        return `
+          <tr>
+            <td>${escapeHtml(formatTime(item.start))}</td>
+            <td>${escapeHtml(formatTime(displayEnd))}</td>
+            <td>${escapeHtml(item.sessionGroup.title)}</td>
+            <td><div class="details">${details}</div></td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    const html = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Conference Schedule</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 32px;
+        font-family: "IBM Plex Sans", sans-serif;
+        color: #1e1d1b;
+        background: #f7f2e8;
+      }
+      h1 {
+        margin: 0 0 16px;
+        font-family: "Iowan Old Style", "Palatino Linotype", serif;
+      }
+      p {
+        margin: 0 0 24px;
+        color: #5e4f40;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: rgba(255, 251, 245, 0.95);
+        border: 1px solid rgba(50, 43, 36, 0.12);
+        border-radius: 16px;
+        overflow: hidden;
+      }
+      th, td {
+        padding: 12px;
+        text-align: left;
+        vertical-align: top;
+        border-bottom: 1px solid rgba(85, 68, 53, 0.12);
+      }
+      th {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #7a6a5a;
+      }
+      .details {
+        display: grid;
+        gap: 8px;
+      }
+      .chip {
+        display: inline-block;
+        border-radius: 999px;
+        padding: 6px 10px;
+        color: #5e4f40;
+      }
+      .slot-short {
+        background: rgba(230, 244, 233, 0.98);
+        border: 1px solid rgba(73, 123, 80, 0.24);
+      }
+      .slot-medium {
+        background: rgba(251, 243, 205, 0.98);
+        border: 1px solid rgba(173, 139, 44, 0.24);
+      }
+      .slot-long {
+        background: rgba(248, 226, 204, 0.98);
+        border: 1px solid rgba(183, 108, 43, 0.24);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Conference Schedule</h1>
+    <p>Projected end: ${escapeHtml(formatTime(projectedEnd))} | Target end: ${escapeHtml(
+      formatTime(targetEnd),
+    )}</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Start</th>
+          <th>End</th>
+          <th>Item</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+      </tbody>
+    </table>
+  </body>
+</html>`;
+
+    const blob = new Blob([html], {
+      type: 'text/html;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'conference-schedule.html';
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
   function handleImportSchedule(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) {
@@ -609,6 +747,9 @@ function App() {
                 onClick={() => setIsScheduleViewOpen((current) => !current)}
               >
                 View Schedule
+              </button>
+              <button className="secondary-button" onClick={handleExportScheduleHtml}>
+                Export HTML
               </button>
               <button className="primary-button" onClick={handleExportSchedule}>
                 Export schedule
@@ -1327,6 +1468,15 @@ function getProposalPreference(
   }
 
   return proposal.preferredTalkDuration === talkDuration ? 'top' : 'not_interested';
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 export default App;

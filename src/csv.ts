@@ -148,6 +148,76 @@ function choosePreferredDuration(
   return 10;
 }
 
+function mergePreference(
+  left: DurationPreference,
+  right: DurationPreference,
+): DurationPreference {
+  const rank: Record<DurationPreference, number> = {
+    not_interested: 0,
+    acceptable: 1,
+    top: 2,
+  };
+
+  return rank[left] >= rank[right] ? left : right;
+}
+
+function condenseDuplicateProposals(proposals: TalkProposal[]): TalkProposal[] {
+  const merged = new Map<string, TalkProposal>();
+
+  for (const proposal of proposals) {
+    const speakerKey = proposal.speakerName.trim().toLowerCase();
+    const existing = merged.get(speakerKey);
+
+    if (!existing) {
+      merged.set(speakerKey, proposal);
+      continue;
+    }
+
+    const titleParts = new Set(
+      `${existing.title}|||${proposal.title}`
+        .split('|||')
+        .map((title) => title.trim())
+        .filter(Boolean),
+    );
+    const affiliationParts = new Set(
+      `${existing.speakerAffiliation}|||${proposal.speakerAffiliation}`
+        .split('|||')
+        .map((affiliation) => affiliation.trim())
+        .filter(Boolean),
+    );
+    const abstractParts = [
+      existing.abstract.trim(),
+      proposal.abstract.trim(),
+    ].filter(Boolean);
+    const existingPreferences = existing.durationPreferences ?? {
+      5: existing.preferredTalkDuration === 5 ? 'top' : 'not_interested',
+      10: existing.preferredTalkDuration === 10 ? 'top' : 'not_interested',
+      15: existing.preferredTalkDuration === 15 ? 'top' : 'not_interested',
+    };
+    const nextPreferences = proposal.durationPreferences ?? {
+      5: proposal.preferredTalkDuration === 5 ? 'top' : 'not_interested',
+      10: proposal.preferredTalkDuration === 10 ? 'top' : 'not_interested',
+      15: proposal.preferredTalkDuration === 15 ? 'top' : 'not_interested',
+    };
+    const mergedPreferences: DurationPreferenceMap = {
+      5: mergePreference(existingPreferences[5], nextPreferences[5]),
+      10: mergePreference(existingPreferences[10], nextPreferences[10]),
+      15: mergePreference(existingPreferences[15], nextPreferences[15]),
+    };
+
+    merged.set(speakerKey, {
+      ...existing,
+      speakerAffiliation: Array.from(affiliationParts).join(' / '),
+      title: Array.from(titleParts).join(' / '),
+      abstract: Array.from(new Set(abstractParts)).join('\n\n'),
+      durationPreferences: mergedPreferences,
+      preferredTalkDuration: choosePreferredDuration(mergedPreferences),
+    });
+  }
+
+  return Array.from(merged.values());
+}
+
 export function proposalsFromCsv(text: string): TalkProposal[] {
   const rows = parseCsv(text);
   const records = rowsToRecords(rows);
@@ -165,7 +235,7 @@ export function proposalsFromCsv(text: string): TalkProposal[] {
     throw new Error('Missing required proposal columns.');
   }
 
-  return records
+  const proposals = records
     .filter((record) => {
       const name = (record[nameHeader] ?? '').trim();
       const title = (record[titleHeader] ?? '').trim();
@@ -184,6 +254,8 @@ export function proposalsFromCsv(text: string): TalkProposal[] {
         durationPreferences,
       };
     });
+
+  return condenseDuplicateProposals(proposals);
 }
 
 function escapeCsvCell(value: string | number): string {
