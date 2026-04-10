@@ -357,7 +357,7 @@ textarea {
 
 .settings-row,
 .summary-grid {
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .summary-bubble {
@@ -371,8 +371,14 @@ textarea {
   gap: 12px;
 }
 
+.summary-row span,
+.summary-row strong {
+  white-space: nowrap;
+}
+
 .summary-row strong {
   font-size: 1rem;
+  text-align: right;
 }
 
 .timeline {
@@ -411,7 +417,10 @@ textarea {
 
 .session-detail-chip,
 .session-detail-meta {
-  display: inline-flex;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   border-radius: 999px;
   padding: 4px 10px;
   background: rgba(239, 229, 215, 0.9);
@@ -435,6 +444,10 @@ textarea {
 .session-detail-chip.slot-long {
   background: rgba(248, 226, 204, 0.98);
   border: 1px solid rgba(183, 108, 43, 0.24);
+}
+
+.chip-duration {
+  font-weight: 400;
 }
 
 .buffer-note {

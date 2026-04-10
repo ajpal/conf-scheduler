@@ -569,7 +569,9 @@ function App() {
             const label = proposal
               ? `${proposal.speakerName}: ${proposal.title}`
               : 'Unassigned';
-            return `<div class="chip ${slotClass}">${escapeHtml(label)}</div>`;
+            return `<div class="chip ${slotClass}"><span>${escapeHtml(
+              label,
+            )}</span><span class="chip-duration">${slot.talkDuration}+${slot.qaDuration}</span></div>`;
           })
           .join('');
 
@@ -746,7 +748,7 @@ function App() {
                 className="secondary-button"
                 onClick={() => setIsScheduleViewOpen((current) => !current)}
               >
-                View Schedule
+                {isScheduleViewOpen ? 'Edit Schedule' : 'View Schedule'}
               </button>
               <button className="secondary-button" onClick={handleExportScheduleHtml}>
                 Export HTML
@@ -807,9 +809,14 @@ function App() {
                                   )}`}
                                   key={slot.id}
                                 >
-                                  {proposal
-                                    ? `${proposal.speakerName}: ${proposal.title}`
-                                    : 'Unassigned'}
+                                  <span>
+                                    {proposal
+                                      ? `${proposal.speakerName}: ${proposal.title}`
+                                      : 'Unassigned'}
+                                  </span>
+                                  <span className="chip-duration">
+                                    {slot.talkDuration}+{slot.qaDuration}
+                                  </span>
                                 </span>
                               );
                             })}
