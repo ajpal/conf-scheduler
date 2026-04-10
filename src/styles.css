@@ -324,6 +324,12 @@ textarea {
   position: relative;
 }
 
+.buffer-note {
+  margin: 4px 0 8px 108px;
+  font-size: 0.78rem;
+  color: #7a6a5a;
+}
+
 .timeline::before {
   content: "";
   position: absolute;

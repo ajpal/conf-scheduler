@@ -552,12 +552,14 @@ function App() {
               start: formatTime(item.start),
               end: formatTime(item.end),
               duration: item.duration,
+              bufferBefore: item.bufferBefore,
             }
           : {
               type: 'session',
               title: item.sessionGroup.title,
               start: formatTime(item.start),
               end: formatTime(item.end),
+              bufferBefore: item.bufferBefore,
               transitionDuration: item.sessionGroup.transitionDuration,
               slots: item.sessionGroup.slots.map((slot) => {
                 const proposal = slot.proposalId ? proposalsById.get(slot.proposalId) : null;
@@ -845,7 +847,71 @@ function App() {
             {schedule.map((item) => {
               if (item.type === 'static') {
                 return (
-                  <article className="timeline-card static-card" key={item.id}>
+                  <div key={item.id}>
+                    {item.bufferBefore > 0 ? (
+                      <div className="buffer-note">
+                        Buffer: {item.bufferBefore} min before {item.title}
+                      </div>
+                    ) : null}
+                    <article className="timeline-card static-card">
+                      <div className="time-column">
+                        <strong>{formatTime(item.start)}</strong>
+                        <span>{formatTime(item.end)}</span>
+                      </div>
+                      <div className="timeline-body">
+                        <div className="timeline-heading">
+                          <div>
+                            <p className="item-tag">Agenda block</p>
+                            <h3>{item.title}</h3>
+                          </div>
+                          <div className="move-controls">
+                            <button
+                              onClick={() => handleMoveAgendaItem(item.id, -1)}
+                              disabled={!canMoveAgendaItem(item.id, -1)}
+                            >
+                              ↑
+                            </button>
+                            <button
+                              onClick={() => handleMoveAgendaItem(item.id, 1)}
+                              disabled={!canMoveAgendaItem(item.id, 1)}
+                            >
+                              ↓
+                            </button>
+                          </div>
+                        </div>
+                        <label className="inline-field">
+                          Duration
+                          <input
+                            type="number"
+                            min={5}
+                            step={5}
+                            value={item.duration}
+                            onChange={(event) =>
+                              handleStaticDurationChange(
+                                item.id,
+                                Number(event.target.value),
+                              )
+                            }
+                            disabled={item.kind === 'breakfast'}
+                          />
+                        </label>
+                      </div>
+                    </article>
+                  </div>
+                );
+              }
+
+              const sessionStart = item.start;
+              let slotCursor = sessionStart;
+
+              return (
+                <div key={item.id}>
+                  {item.bufferBefore > 0 ? (
+                    <div className="buffer-note">
+                      Buffer: {item.bufferBefore} min before {item.sessionGroup.title}
+                    </div>
+                  ) : null}
+                  <article className="timeline-card session-card">
                     <div className="time-column">
                       <strong>{formatTime(item.start)}</strong>
                       <span>{formatTime(item.end)}</span>
@@ -853,8 +919,12 @@ function App() {
                     <div className="timeline-body">
                       <div className="timeline-heading">
                         <div>
-                          <p className="item-tag">Agenda block</p>
-                          <h3>{item.title}</h3>
+                          <p className="item-tag">Session</p>
+                          <h3>{item.sessionGroup.title}</h3>
+                          <p className="speaker-line">
+                            {item.sessionGroup.slots.length} talks, {item.sessionGroup.transitionDuration}
+                            {' '}min transition between talks
+                          </p>
                         </div>
                         <div className="move-controls">
                           <button
@@ -871,95 +941,40 @@ function App() {
                           </button>
                         </div>
                       </div>
-                      <label className="inline-field">
-                        Duration
-                        <input
-                          type="number"
-                          min={5}
-                          step={5}
-                          value={item.duration}
-                          onChange={(event) =>
-                            handleStaticDurationChange(
-                              item.id,
-                              Number(event.target.value),
-                            )
-                          }
-                          disabled={item.kind === 'breakfast'}
-                        />
-                      </label>
-                    </div>
-                  </article>
-                );
-              }
 
-              const sessionStart = item.start;
-              let slotCursor = sessionStart;
-
-              return (
-                <article className="timeline-card session-card" key={item.id}>
-                  <div className="time-column">
-                    <strong>{formatTime(item.start)}</strong>
-                    <span>{formatTime(item.end)}</span>
-                  </div>
-                  <div className="timeline-body">
-                    <div className="timeline-heading">
-                      <div>
-                        <p className="item-tag">Session</p>
-                        <h3>{item.sessionGroup.title}</h3>
-                        <p className="speaker-line">
-                          {item.sessionGroup.slots.length} talks, {item.sessionGroup.transitionDuration}
-                          {' '}min transition between talks
-                        </p>
+                      <div className="session-group-controls">
+                        <label>
+                          Session title
+                          <input
+                            value={item.sessionGroup.title}
+                            onChange={(event) =>
+                              handleSessionGroupChange(
+                                item.sessionGroup.id,
+                                'title',
+                                event.target.value,
+                              )
+                            }
+                          />
+                        </label>
+                        <label className="inline-field">
+                          Transition
+                          <input
+                            type="number"
+                            min={0}
+                            value={item.sessionGroup.transitionDuration}
+                            onChange={(event) =>
+                              handleSessionGroupChange(
+                                item.sessionGroup.id,
+                                'transitionDuration',
+                                Number(event.target.value),
+                              )
+                            }
+                          />
+                        </label>
                       </div>
-                      <div className="move-controls">
-                        <button
-                          onClick={() => handleMoveAgendaItem(item.id, -1)}
-                          disabled={!canMoveAgendaItem(item.id, -1)}
-                        >
-                          ↑
-                        </button>
-                        <button
-                          onClick={() => handleMoveAgendaItem(item.id, 1)}
-                          disabled={!canMoveAgendaItem(item.id, 1)}
-                        >
-                          ↓
-                        </button>
-                      </div>
-                    </div>
 
-                    <div className="session-group-controls">
-                      <label>
-                        Session title
-                        <input
-                          value={item.sessionGroup.title}
-                          onChange={(event) =>
-                            handleSessionGroupChange(
-                              item.sessionGroup.id,
-                              'title',
-                              event.target.value,
-                            )
-                          }
-                        />
-                      </label>
-                      <label className="inline-field">
-                        Transition
-                        <input
-                          type="number"
-                          min={0}
-                          value={item.sessionGroup.transitionDuration}
-                          onChange={(event) =>
-                            handleSessionGroupChange(
-                              item.sessionGroup.id,
-                              'transitionDuration',
-                              Number(event.target.value),
-                            )
-                          }
-                        />
-                      </label>
-                    </div>
-
-                    <div className="nested-slot-list">
-                      {item.sessionGroup.slots.map((slot, slotIndex) => {
+                      <div className="nested-slot-list">
+                        {item.sessionGroup.slots.map((slot, slotIndex) => {
                         const slotStart = slotCursor;
                         const slotEnd = slotStart + getSlotDuration(slot);
                         slotCursor =
@@ -1107,40 +1122,41 @@ function App() {
                             </div>
                           </div>
                         );
-                      })}
-                    </div>
+                        })}
+                      </div>
 
-                    <div className="session-footer">
-                      <span>Total session: {getSessionGroupDuration(item.sessionGroup)} min</span>
-                      <div className="slot-actions">
-                        <button
-                          className="secondary-button"
-                          onClick={() => handleAddSlot(item.sessionGroup.id, 5)}
-                        >
-                          Add short
-                        </button>
-                        <button
-                          className="secondary-button"
-                          onClick={() => handleAddSlot(item.sessionGroup.id, 10)}
-                        >
-                          Add medium
-                        </button>
-                        <button
-                          className="secondary-button"
-                          onClick={() => handleAddSlot(item.sessionGroup.id, 15)}
-                        >
-                          Add long
-                        </button>
-                        <button
-                          className="secondary-button danger-button"
-                          onClick={() => handleRemoveSessionGroup(item.sessionGroup.id)}
-                        >
-                          Remove session
-                        </button>
+                      <div className="session-footer">
+                        <span>Total session: {getSessionGroupDuration(item.sessionGroup)} min</span>
+                        <div className="slot-actions">
+                          <button
+                            className="secondary-button"
+                            onClick={() => handleAddSlot(item.sessionGroup.id, 5)}
+                          >
+                            Add short
+                          </button>
+                          <button
+                            className="secondary-button"
+                            onClick={() => handleAddSlot(item.sessionGroup.id, 10)}
+                          >
+                            Add medium
+                          </button>
+                          <button
+                            className="secondary-button"
+                            onClick={() => handleAddSlot(item.sessionGroup.id, 15)}
+                          >
+                            Add long
+                          </button>
+                          <button
+                            className="secondary-button danger-button"
+                            onClick={() => handleRemoveSessionGroup(item.sessionGroup.id)}
+                          >
+                            Remove session
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </article>
+                  </article>
+                </div>
               );
             })}
           </div>

@@ -33,6 +33,10 @@ export function getSessionGroupDuration(sessionGroup: SessionGroup): number {
   return talkTime + transitions;
 }
 
+export function roundUpToQuarterHour(totalMinutes: number): number {
+  return Math.ceil(totalMinutes / 15) * 15;
+}
+
 export function buildSchedule(
   agenda: AgendaItem[],
   sessionGroups: SessionGroup[],
@@ -45,8 +49,9 @@ export function buildSchedule(
 
   for (const item of agenda) {
     if (item.type === 'static') {
-      const start = item.fixedStart ?? cursor;
+      const start = item.fixedStart ?? roundUpToQuarterHour(cursor);
       const end = start + item.duration;
+      const bufferBefore = Math.max(0, start - cursor);
       cursor = end;
       scheduled.push({
         id: item.id,
@@ -55,6 +60,7 @@ export function buildSchedule(
         start,
         end,
         duration: item.duration,
+        bufferBefore,
         kind: item.kind,
       });
       continue;
@@ -66,8 +72,9 @@ export function buildSchedule(
     }
 
     const duration = getSessionGroupDuration(sessionGroup);
-    const start = cursor;
+    const start = roundUpToQuarterHour(cursor);
     const end = start + duration;
+    const bufferBefore = Math.max(0, start - cursor);
     cursor = end;
 
     scheduled.push({
@@ -76,6 +83,7 @@ export function buildSchedule(
       start,
       end,
       duration,
+      bufferBefore,
       sessionGroup,
     });
   }

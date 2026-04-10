@@ -56,6 +56,7 @@ export type ScheduledAgendaItem =
       start: number;
       end: number;
       duration: number;
+      bufferBefore: number;
       kind: StaticBlockKind;
     }
   | {
@@ -64,5 +65,6 @@ export type ScheduledAgendaItem =
       start: number;
       end: number;
       duration: number;
+      bufferBefore: number;
       sessionGroup: SessionGroup;
     };
