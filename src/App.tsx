@@ -1,4 +1,4 @@
-import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useMemo, useState } from 'react';
 import {
   proposalsFromCsv,
   scheduleStateFromCsv,
@@ -41,15 +41,6 @@ type NewSessionTemplateForm = {
   defaultQaDuration: number;
 };
 
-type PersistedState = {
-  proposals: TalkProposal[];
-  sessionGroups: SessionGroup[];
-  agenda: AgendaItem[];
-  targetEnd: number;
-};
-
-const STORAGE_KEY = 'conference-scheduler-state';
-
 const initialProposalForm: NewProposalForm = {
   speakerName: '',
   speakerAffiliation: '',
@@ -69,40 +60,15 @@ const initialSessionForm: NewSessionTemplateForm = {
 
 const defaultScheduleState = createDefaultScheduleState();
 
-function loadInitialState(): PersistedState {
-  const fallback: PersistedState = {
-    proposals: [],
-    sessionGroups: defaultScheduleState.sessionGroups,
-    agenda: defaultScheduleState.agenda,
-    targetEnd: TARGET_END,
-  };
-
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  if (!stored) {
-    return fallback;
-  }
-
-  try {
-    const parsed = JSON.parse(stored) as Partial<PersistedState>;
-    return {
-      proposals: parsed.proposals ?? fallback.proposals,
-      sessionGroups: parsed.sessionGroups ?? fallback.sessionGroups,
-      agenda: parsed.agenda ?? fallback.agenda,
-      targetEnd: parsed.targetEnd ?? fallback.targetEnd,
-    };
-  } catch {
-    return fallback;
-  }
-}
-
 function App() {
-  const initialState = useMemo(() => loadInitialState(), []);
-  const [proposals, setProposals] = useState<TalkProposal[]>(initialState.proposals);
-  const [sessionGroups, setSessionGroups] = useState<SessionGroup[]>(initialState.sessionGroups);
-  const [agenda, setAgenda] = useState<AgendaItem[]>(initialState.agenda);
+  const [proposals, setProposals] = useState<TalkProposal[]>([]);
+  const [sessionGroups, setSessionGroups] = useState<SessionGroup[]>(
+    defaultScheduleState.sessionGroups,
+  );
+  const [agenda, setAgenda] = useState<AgendaItem[]>(defaultScheduleState.agenda);
   const [proposalForm, setProposalForm] = useState(initialProposalForm);
   const [sessionForm, setSessionForm] = useState(initialSessionForm);
-  const [targetEnd, setTargetEnd] = useState(initialState.targetEnd);
+  const [targetEnd, setTargetEnd] = useState(TARGET_END);
   const [isScheduleViewOpen, setIsScheduleViewOpen] = useState(false);
   const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
   const [proposalError, setProposalError] = useState('');
@@ -165,17 +131,6 @@ function App() {
       total + sessionGroup.slots.filter((slot) => slot.talkDuration > 10).length,
     0,
   );
-
-  useEffect(() => {
-    const nextState: PersistedState = {
-      proposals,
-      sessionGroups,
-      agenda,
-      targetEnd,
-    };
-
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
-  }, [agenda, proposals, sessionGroups, targetEnd]);
 
   function updateProposalForm<K extends keyof NewProposalForm>(
     key: K,
