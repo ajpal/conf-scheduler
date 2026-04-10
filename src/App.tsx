@@ -49,7 +49,7 @@ type PersistedState = {
   targetEnd: number;
 };
 
-const STORAGE_KEY = 'pnwplse-scheduler-state';
+const STORAGE_KEY = 'conference-scheduler-state';
 
 const initialProposalForm: NewProposalForm = {
   speakerName: '',
