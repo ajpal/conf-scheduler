@@ -357,6 +357,45 @@ function App() {
     );
   }
 
+  function handleAddSlot(
+    sessionGroupId: string,
+    talkDuration: 5 | 10 | 15,
+  ) {
+    setSessionGroups((current) =>
+      current.map((sessionGroup) =>
+        sessionGroup.id === sessionGroupId
+          ? {
+              ...sessionGroup,
+              slots: [
+                ...sessionGroup.slots,
+                {
+                  id: `slot-${crypto.randomUUID()}`,
+                  proposalId: null,
+                  talkDuration,
+                  qaDuration: 0,
+                },
+              ],
+            }
+          : sessionGroup,
+      ),
+    );
+  }
+
+  function handleRemoveSlot(sessionGroupId: string, slotId: string) {
+    setSessionGroups((current) =>
+      current.map((sessionGroup) => {
+        if (sessionGroup.id !== sessionGroupId) {
+          return sessionGroup;
+        }
+
+        return {
+          ...sessionGroup,
+          slots: sessionGroup.slots.filter((slot) => slot.id !== slotId),
+        };
+      }),
+    );
+  }
+
   function findAgendaIndex(itemId: string): number {
     return agenda.findIndex((item) => item.id === itemId);
   }
@@ -926,36 +965,45 @@ function App() {
                               <span>{formatTime(slotEnd)}</span>
                             </div>
                             <div className="nested-slot-body">
-                              <label className="assignment-field">
-                                {slotLengthLabel}
-                                <select
-                                  value={slot.proposalId ?? ''}
-                                  onChange={(event) =>
-                                    handleAssignProposal(
-                                      item.sessionGroup.id,
-                                      slot.id,
-                                      event.target.value === '' ? null : event.target.value,
-                                    )
-                                  }
-                                >
-                                  <option value="">Unassigned</option>
-                                  {proposals.map((proposalOption) => {
-                                    const assignedElsewhere =
-                                      proposalOption.id !== slot.proposalId &&
-                                      scheduledProposalIds.has(proposalOption.id);
+                              <div className="slot-header">
+                                <label className="assignment-field">
+                                  {slotLengthLabel}
+                                  <select
+                                    value={slot.proposalId ?? ''}
+                                    onChange={(event) =>
+                                      handleAssignProposal(
+                                        item.sessionGroup.id,
+                                        slot.id,
+                                        event.target.value === '' ? null : event.target.value,
+                                      )
+                                    }
+                                  >
+                                    <option value="">Unassigned</option>
+                                    {proposals.map((proposalOption) => {
+                                      const assignedElsewhere =
+                                        proposalOption.id !== slot.proposalId &&
+                                        scheduledProposalIds.has(proposalOption.id);
 
-                                    return (
-                                      <option
-                                        key={proposalOption.id}
-                                        value={proposalOption.id}
-                                        disabled={assignedElsewhere}
-                                      >
-                                        {proposalOption.title} - {proposalOption.speakerName}
-                                      </option>
-                                    );
-                                  })}
-                                </select>
-                              </label>
+                                      return (
+                                        <option
+                                          key={proposalOption.id}
+                                          value={proposalOption.id}
+                                          disabled={assignedElsewhere}
+                                        >
+                                          {proposalOption.title} - {proposalOption.speakerName}
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
+                                </label>
+                                <button
+                                  className="slot-remove-button"
+                                  onClick={() => handleRemoveSlot(item.sessionGroup.id, slot.id)}
+                                  aria-label={`Remove ${slotLengthLabel.toLowerCase()} talk`}
+                                >
+                                  X
+                                </button>
+                              </div>
                               <div className="slot-meta-grid">
                                 <label className="inline-field">
                                   Talk
@@ -1010,12 +1058,32 @@ function App() {
 
                     <div className="session-footer">
                       <span>Total session: {getSessionGroupDuration(item.sessionGroup)} min</span>
-                      <button
-                        className="secondary-button danger-button"
-                        onClick={() => handleRemoveSessionGroup(item.sessionGroup.id)}
-                      >
-                        Remove session
-                      </button>
+                      <div className="slot-actions">
+                        <button
+                          className="secondary-button"
+                          onClick={() => handleAddSlot(item.sessionGroup.id, 5)}
+                        >
+                          Add short
+                        </button>
+                        <button
+                          className="secondary-button"
+                          onClick={() => handleAddSlot(item.sessionGroup.id, 10)}
+                        >
+                          Add medium
+                        </button>
+                        <button
+                          className="secondary-button"
+                          onClick={() => handleAddSlot(item.sessionGroup.id, 15)}
+                        >
+                          Add long
+                        </button>
+                        <button
+                          className="secondary-button danger-button"
+                          onClick={() => handleRemoveSessionGroup(item.sessionGroup.id)}
+                        >
+                          Remove session
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </article>
