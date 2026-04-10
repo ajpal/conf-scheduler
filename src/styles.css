@@ -103,6 +103,18 @@ button {
   flex-wrap: wrap;
 }
 
+.file-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.file-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
 .search-input {
   width: min(320px, 100%);
 }
@@ -350,8 +362,7 @@ textarea {
 }
 
 .schedule-session-details {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: 8px;
 }
 
@@ -366,6 +377,21 @@ textarea {
 
 .session-detail-meta {
   background: rgba(231, 238, 234, 0.9);
+}
+
+.session-detail-chip.slot-short {
+  background: rgba(230, 244, 233, 0.98);
+  border: 1px solid rgba(73, 123, 80, 0.24);
+}
+
+.session-detail-chip.slot-medium {
+  background: rgba(251, 243, 205, 0.98);
+  border: 1px solid rgba(173, 139, 44, 0.24);
+}
+
+.session-detail-chip.slot-long {
+  background: rgba(248, 226, 204, 0.98);
+  border: 1px solid rgba(183, 108, 43, 0.24);
 }
 
 .buffer-note {

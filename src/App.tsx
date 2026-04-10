@@ -1,5 +1,9 @@
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
-import { proposalsFromCsv } from './csv';
+import {
+  proposalsFromCsv,
+  scheduleStateFromCsv,
+  serializeScheduleToCsv,
+} from './csv';
 import bundledProposalCsv from './talk-proposals.csv?raw';
 import { createDefaultScheduleState } from './defaultSchedule';
 import {
@@ -537,53 +541,42 @@ function App() {
     setTargetEnd(hours * 60 + minutes);
   }
 
-  function handleExport() {
-    const exportPayload = {
-      metadata: {
-        targetEnd: formatTime(targetEnd),
-      },
-      proposals,
-      agenda: schedule.map((item) =>
-        item.type === 'static'
-          ? {
-              type: 'static',
-              title: item.title,
-              start: formatTime(item.start),
-              end: formatTime(item.end),
-              duration: item.duration,
-              bufferBefore: item.bufferBefore,
-            }
-          : {
-              type: 'session',
-              title: item.sessionGroup.title,
-              start: formatTime(item.start),
-              end: formatTime(item.end),
-              bufferBefore: item.bufferBefore,
-              transitionDuration: item.sessionGroup.transitionDuration,
-              slots: item.sessionGroup.slots.map((slot) => {
-                const proposal = slot.proposalId ? proposalsById.get(slot.proposalId) : null;
-                return {
-                  title: proposal ? proposal.title : 'Unassigned session slot',
-                  speakerName: proposal ? proposal.speakerName : '',
-                  speakerAffiliation: proposal ? proposal.speakerAffiliation : '',
-                  talkDuration: slot.talkDuration,
-                  qaDuration: slot.qaDuration,
-                };
-              }),
-            },
-      ),
-      unscheduledProposals,
-    };
-
-    const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
-      type: 'application/json',
+  function handleExportSchedule() {
+    const csv = serializeScheduleToCsv(agenda, sessionGroups, proposals, targetEnd);
+    const blob = new Blob([csv], {
+      type: 'text/csv;charset=utf-8',
     });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = 'conference-schedule.json';
+    anchor.download = 'conference-schedule.csv';
     anchor.click();
     URL.revokeObjectURL(url);
+  }
+
+  function handleImportSchedule(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    file
+      .text()
+      .then((text) => {
+        const imported = scheduleStateFromCsv(text, proposals);
+        setAgenda(imported.agenda);
+        setSessionGroups(imported.sessionGroups);
+        if (imported.targetEnd !== null) {
+          setTargetEnd(imported.targetEnd);
+        }
+        setIsScheduleViewOpen(false);
+      })
+      .catch(() => {
+        window.alert('Unable to import schedule. Expected a schedule CSV exported by this app.');
+      })
+      .finally(() => {
+        event.target.value = '';
+      });
   }
 
   return (
@@ -722,13 +715,21 @@ function App() {
               <h2>Session-based timeline</h2>
             </div>
             <div className="panel-actions">
+              <label className="secondary-button file-button">
+                Import Schedule
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={handleImportSchedule}
+                />
+              </label>
               <button
                 className="secondary-button"
                 onClick={() => setIsScheduleViewOpen((current) => !current)}
               >
                 View Schedule
               </button>
-              <button className="primary-button" onClick={handleExport}>
+              <button className="primary-button" onClick={handleExportSchedule}>
                 Export schedule
               </button>
             </div>
@@ -747,15 +748,21 @@ function App() {
                 </thead>
                 <tbody>
                   {schedule.map((item) => {
+                    const currentIndex = schedule.findIndex((candidate) => candidate.id === item.id);
+                    const nextItem =
+                      currentIndex >= 0 && currentIndex < schedule.length - 1
+                        ? schedule[currentIndex + 1]
+                        : null;
+                    const displayEnd =
+                      item.type === 'session' && nextItem ? nextItem.start : item.end;
+
                     if (item.type === 'static') {
                       return (
                         <tr key={item.id}>
                           <td>{formatTime(item.start)}</td>
-                          <td>{formatTime(item.end)}</td>
+                          <td>{formatTime(displayEnd)}</td>
                           <td>{item.title}</td>
-                          <td>
-                            {item.bufferBefore > 0 ? `Buffer before: ${item.bufferBefore} min` : ''}
-                          </td>
+                          <td />
                         </tr>
                       );
                     }
@@ -763,7 +770,7 @@ function App() {
                     return (
                       <tr key={item.id}>
                         <td>{formatTime(item.start)}</td>
-                        <td>{formatTime(item.end)}</td>
+                        <td>{formatTime(displayEnd)}</td>
                         <td>{item.sessionGroup.title}</td>
                         <td>
                           <div className="schedule-session-details">
@@ -771,23 +778,19 @@ function App() {
                               const proposal = slot.proposalId
                                 ? proposalsById.get(slot.proposalId) ?? null
                                 : null;
-                              const slotLabel = getSlotLengthLabel(slot.talkDuration);
                               return (
-                                <span className="session-detail-chip" key={slot.id}>
-                                  {slotLabel}: {proposal ? proposal.title : 'Unassigned'} ({slot.talkDuration}
-                                  {' + '}
-                                  {slot.qaDuration} Q&A)
+                                <span
+                                  className={`session-detail-chip ${getSlotLengthClass(
+                                    slot.talkDuration,
+                                  )}`}
+                                  key={slot.id}
+                                >
+                                  {proposal
+                                    ? `${proposal.speakerName}: ${proposal.title}`
+                                    : 'Unassigned'}
                                 </span>
                               );
                             })}
-                            <span className="session-detail-meta">
-                              Transition: {item.sessionGroup.transitionDuration} min
-                            </span>
-                            {item.bufferBefore > 0 ? (
-                              <span className="session-detail-meta">
-                                Buffer before: {item.bufferBefore} min
-                              </span>
-                            ) : null}
                           </div>
                         </td>
                       </tr>

@@ -1,7 +1,10 @@
 import {
+  AgendaItem,
   DurationMinutes,
   DurationPreference,
   DurationPreferenceMap,
+  SessionGroup,
+  StaticBlockKind,
   TalkProposal,
 } from './types';
 
@@ -181,4 +184,233 @@ export function proposalsFromCsv(text: string): TalkProposal[] {
         durationPreferences,
       };
     });
+}
+
+function escapeCsvCell(value: string | number): string {
+  const stringValue = String(value);
+  if (
+    stringValue.includes(',') ||
+    stringValue.includes('"') ||
+    stringValue.includes('\n') ||
+    stringValue.includes('\r')
+  ) {
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  }
+  return stringValue;
+}
+
+type ScheduleCsvRow = {
+  rowType: 'static' | 'session';
+  agendaId: string;
+  sessionGroupId: string;
+  title: string;
+  kind: string;
+  duration: number;
+  fixedStart: string;
+  transitionDuration: string;
+  slotId: string;
+  slotIndex: string;
+  talkDuration: string;
+  qaDuration: string;
+  proposalId: string;
+  proposalTitle: string;
+  speakerName: string;
+  targetEnd: string;
+};
+
+function matchProposal(
+  record: CsvRecord,
+  proposals: TalkProposal[],
+): TalkProposal | null {
+  const proposalId = (record.proposalId ?? '').trim();
+  const title = (record.proposalTitle ?? '').trim();
+  const speakerName = (record.speakerName ?? '').trim();
+
+  if (proposalId) {
+    const byId = proposals.find((proposal) => proposal.id === proposalId);
+    if (byId) {
+      return byId;
+    }
+  }
+
+  if (title || speakerName) {
+    const normalizedTitle = title.toLowerCase();
+    const normalizedSpeaker = speakerName.toLowerCase();
+    const byIdentity = proposals.find(
+      (proposal) =>
+        proposal.title.trim().toLowerCase() === normalizedTitle &&
+        proposal.speakerName.trim().toLowerCase() === normalizedSpeaker,
+    );
+    if (byIdentity) {
+      return byIdentity;
+    }
+  }
+
+  return null;
+}
+
+export function serializeScheduleToCsv(
+  agenda: AgendaItem[],
+  sessionGroups: SessionGroup[],
+  proposals: TalkProposal[],
+  targetEnd: number,
+): string {
+  const sessionGroupsById = new Map(
+    sessionGroups.map((sessionGroup) => [sessionGroup.id, sessionGroup]),
+  );
+  const proposalsById = new Map(proposals.map((proposal) => [proposal.id, proposal]));
+  const headers: Array<keyof ScheduleCsvRow> = [
+    'rowType',
+    'agendaId',
+    'sessionGroupId',
+    'title',
+    'kind',
+    'duration',
+    'fixedStart',
+    'transitionDuration',
+    'slotId',
+    'slotIndex',
+    'talkDuration',
+    'qaDuration',
+    'proposalId',
+    'proposalTitle',
+    'speakerName',
+    'targetEnd',
+  ];
+
+  const rows: ScheduleCsvRow[] = [];
+
+  for (const item of agenda) {
+    if (item.type === 'static') {
+      rows.push({
+        rowType: 'static',
+        agendaId: item.id,
+        sessionGroupId: '',
+        title: item.title,
+        kind: item.kind,
+        duration: item.duration,
+        fixedStart: item.fixedStart !== undefined ? String(item.fixedStart) : '',
+        transitionDuration: '',
+        slotId: '',
+        slotIndex: '',
+        talkDuration: '',
+        qaDuration: '',
+        proposalId: '',
+        proposalTitle: '',
+        speakerName: '',
+        targetEnd: String(targetEnd),
+      });
+      continue;
+    }
+
+    const sessionGroup = sessionGroupsById.get(item.sessionGroupId);
+    if (!sessionGroup) {
+      continue;
+    }
+
+    sessionGroup.slots.forEach((slot, slotIndex) => {
+      const proposal = slot.proposalId ? proposalsById.get(slot.proposalId) : undefined;
+      rows.push({
+        rowType: 'session',
+        agendaId: item.id,
+        sessionGroupId: sessionGroup.id,
+        title: sessionGroup.title,
+        kind: '',
+        duration: 0,
+        fixedStart: '',
+        transitionDuration: String(sessionGroup.transitionDuration),
+        slotId: slot.id,
+        slotIndex: String(slotIndex),
+        talkDuration: String(slot.talkDuration),
+        qaDuration: String(slot.qaDuration),
+        proposalId: slot.proposalId ?? '',
+        proposalTitle: proposal?.title ?? '',
+        speakerName: proposal?.speakerName ?? '',
+        targetEnd: String(targetEnd),
+      });
+    });
+  }
+
+  return [
+    headers.join(','),
+    ...rows.map((row) =>
+      headers.map((header) => escapeCsvCell(row[header])).join(','),
+    ),
+  ].join('\n');
+}
+
+export function scheduleStateFromCsv(
+  text: string,
+  proposals: TalkProposal[],
+): {
+  agenda: AgendaItem[];
+  sessionGroups: SessionGroup[];
+  targetEnd: number | null;
+} {
+  const rows = parseCsv(text);
+  const records = rowsToRecords(rows);
+  const agenda: AgendaItem[] = [];
+  const sessionGroups: SessionGroup[] = [];
+  const sessionGroupIndex = new Map<string, number>();
+  let targetEnd: number | null = null;
+
+  for (const record of records) {
+    if (targetEnd === null) {
+      const parsedTargetEnd = Number(record.targetEnd ?? '');
+      if (!Number.isNaN(parsedTargetEnd) && parsedTargetEnd > 0) {
+        targetEnd = parsedTargetEnd;
+      }
+    }
+
+    const rowType = (record.rowType ?? '').trim();
+    if (rowType === 'static') {
+      agenda.push({
+        id: (record.agendaId ?? '').trim() || `agenda-static-${agenda.length + 1}`,
+        type: 'static',
+        kind: ((record.kind ?? 'break') as StaticBlockKind),
+        title: (record.title ?? '').trim() || 'Block',
+        duration: Number(record.duration ?? 0) || 0,
+        fixedStart:
+          (record.fixedStart ?? '').trim() !== ''
+            ? Number(record.fixedStart)
+            : undefined,
+      });
+      continue;
+    }
+
+    if (rowType !== 'session') {
+      continue;
+    }
+
+    const sessionGroupId =
+      (record.sessionGroupId ?? '').trim() || `session-group-${sessionGroups.length + 1}`;
+    const agendaId = (record.agendaId ?? '').trim() || `agenda-session-${agenda.length + 1}`;
+    let groupPosition = sessionGroupIndex.get(sessionGroupId);
+
+    if (groupPosition === undefined) {
+      groupPosition = sessionGroups.length;
+      sessionGroupIndex.set(sessionGroupId, groupPosition);
+      sessionGroups.push({
+        id: sessionGroupId,
+        title: (record.title ?? '').trim() || `Session ${sessionGroups.length + 1}`,
+        transitionDuration: Number(record.transitionDuration ?? 0) || 0,
+        slots: [],
+      });
+      agenda.push({
+        id: agendaId,
+        type: 'session',
+        sessionGroupId,
+      });
+    }
+
+    const matchedProposal = matchProposal(record, proposals);
+    sessionGroups[groupPosition].slots.push({
+      id: (record.slotId ?? '').trim() || `slot-${sessionGroups[groupPosition].slots.length + 1}`,
+      proposalId: matchedProposal?.id ?? null,
+      talkDuration: Number(record.talkDuration ?? 0) || 0,
+      qaDuration: Number(record.qaDuration ?? 0) || 0,
+    });
+  }
+
+  return { agenda, sessionGroups, targetEnd };
 }
