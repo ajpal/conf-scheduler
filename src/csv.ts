@@ -1,4 +1,9 @@
-import { TalkProposal } from './types';
+import {
+  DurationMinutes,
+  DurationPreference,
+  DurationPreferenceMap,
+  TalkProposal,
+} from './types';
 
 type CsvRecord = Record<string, string>;
 
@@ -81,9 +86,26 @@ function normalizePreference(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function choosePreferredDuration(record: CsvRecord, headers: string[]): 5 | 10 | 15 {
-  const topPreferences: Array<5 | 10 | 15> = [];
-  const acceptablePreferences: Array<5 | 10 | 15> = [];
+function parsePreference(value: string): DurationPreference {
+  const normalized = normalizePreference(value);
+  if (normalized === 'top preference') {
+    return 'top';
+  }
+  if (normalized === 'acceptable') {
+    return 'acceptable';
+  }
+  return 'not_interested';
+}
+
+function getDurationPreferences(
+  record: CsvRecord,
+  headers: string[],
+): DurationPreferenceMap {
+  const preferences: DurationPreferenceMap = {
+    5: 'not_interested',
+    10: 'not_interested',
+    15: 'not_interested',
+  };
 
   for (const column of DURATION_COLUMNS) {
     const header = headers.find((candidate) => candidate.includes(column.keyFragment));
@@ -91,8 +113,21 @@ function choosePreferredDuration(record: CsvRecord, headers: string[]): 5 | 10 |
       continue;
     }
 
-    const preference = normalizePreference(record[header] ?? '');
-    if (preference === 'top preference') {
+    preferences[column.duration] = parsePreference(record[header] ?? '');
+  }
+
+  return preferences;
+}
+
+function choosePreferredDuration(
+  durationPreferences: DurationPreferenceMap,
+): DurationMinutes {
+  const topPreferences: Array<5 | 10 | 15> = [];
+  const acceptablePreferences: Array<5 | 10 | 15> = [];
+
+  for (const column of DURATION_COLUMNS) {
+    const preference = durationPreferences[column.duration];
+    if (preference === 'top') {
       topPreferences.push(column.duration);
     } else if (preference === 'acceptable') {
       acceptablePreferences.push(column.duration);
@@ -133,12 +168,17 @@ export function proposalsFromCsv(text: string): TalkProposal[] {
       const title = (record[titleHeader] ?? '').trim();
       return name !== '' && title !== '';
     })
-    .map((record, index) => ({
-      id: `talk-import-${index + 1}`,
-      speakerName: (record[nameHeader] ?? '').trim(),
-      speakerAffiliation: affiliationHeader ? (record[affiliationHeader] ?? '').trim() : '',
-      title: (record[titleHeader] ?? '').trim(),
-      abstract: (record[abstractHeader] ?? '').trim(),
-      preferredTalkDuration: choosePreferredDuration(record, headers),
-    }));
+    .map((record, index) => {
+      const durationPreferences = getDurationPreferences(record, headers);
+
+      return {
+        id: `talk-import-${index + 1}`,
+        speakerName: (record[nameHeader] ?? '').trim(),
+        speakerAffiliation: affiliationHeader ? (record[affiliationHeader] ?? '').trim() : '',
+        title: (record[titleHeader] ?? '').trim(),
+        abstract: (record[abstractHeader] ?? '').trim(),
+        preferredTalkDuration: choosePreferredDuration(durationPreferences),
+        durationPreferences,
+      };
+    });
 }

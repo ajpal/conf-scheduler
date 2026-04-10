@@ -15,7 +15,15 @@ import {
   moveItem,
   TARGET_END,
 } from './schedule';
-import { AgendaItem, SessionGroup, SessionSlot, TalkProposal } from './types';
+import {
+  AgendaItem,
+  DurationMinutes,
+  DurationPreference,
+  DurationPreferenceMap,
+  SessionGroup,
+  SessionSlot,
+  TalkProposal,
+} from './types';
 
 type NewProposalForm = {
   speakerName: string;
@@ -188,6 +196,9 @@ function App() {
       title,
       abstract,
       preferredTalkDuration: Number(proposalForm.preferredTalkDuration) as 5 | 10 | 15,
+      durationPreferences: createDefaultDurationPreferences(
+        Number(proposalForm.preferredTalkDuration) as DurationMinutes,
+      ),
     };
 
     setProposals((current) => [proposal, ...current]);
@@ -484,6 +495,9 @@ function App() {
           : (JSON.parse(text) as TalkProposal[]).map((proposal) => ({
               ...proposal,
               id: proposal.id || `talk-${crypto.randomUUID()}`,
+              durationPreferences:
+                proposal.durationPreferences ??
+                createDefaultDurationPreferences(proposal.preferredTalkDuration),
             }));
 
         setProposals(imported);
@@ -952,6 +966,18 @@ function App() {
                           ? proposalsById.get(slot.proposalId) ?? null
                           : null;
                         const slotLengthLabel = getSlotLengthLabel(slot.talkDuration);
+                        const topPreferenceOptions = proposals.filter((proposalOption) =>
+                          getProposalPreference(
+                            proposalOption,
+                            slot.talkDuration as DurationMinutes,
+                          ) === 'top',
+                        );
+                        const acceptableOptions = proposals.filter((proposalOption) =>
+                          getProposalPreference(
+                            proposalOption,
+                            slot.talkDuration as DurationMinutes,
+                          ) === 'acceptable',
+                        );
 
                         return (
                           <div
@@ -979,21 +1005,44 @@ function App() {
                                     }
                                   >
                                     <option value="">Unassigned</option>
-                                    {proposals.map((proposalOption) => {
-                                      const assignedElsewhere =
-                                        proposalOption.id !== slot.proposalId &&
-                                        scheduledProposalIds.has(proposalOption.id);
+                                    {topPreferenceOptions.length > 0 ? (
+                                      <optgroup label="Top Preference">
+                                        {topPreferenceOptions.map((proposalOption) => {
+                                          const assignedElsewhere =
+                                            proposalOption.id !== slot.proposalId &&
+                                            scheduledProposalIds.has(proposalOption.id);
 
-                                      return (
-                                        <option
-                                          key={proposalOption.id}
-                                          value={proposalOption.id}
-                                          disabled={assignedElsewhere}
-                                        >
-                                          {proposalOption.title} - {proposalOption.speakerName}
-                                        </option>
-                                      );
-                                    })}
+                                          return (
+                                            <option
+                                              key={proposalOption.id}
+                                              value={proposalOption.id}
+                                              disabled={assignedElsewhere}
+                                            >
+                                              {proposalOption.title} - {proposalOption.speakerName}
+                                            </option>
+                                          );
+                                        })}
+                                      </optgroup>
+                                    ) : null}
+                                    {acceptableOptions.length > 0 ? (
+                                      <optgroup label="Acceptable">
+                                        {acceptableOptions.map((proposalOption) => {
+                                          const assignedElsewhere =
+                                            proposalOption.id !== slot.proposalId &&
+                                            scheduledProposalIds.has(proposalOption.id);
+
+                                          return (
+                                            <option
+                                              key={proposalOption.id}
+                                              value={proposalOption.id}
+                                              disabled={assignedElsewhere}
+                                            >
+                                              {proposalOption.title} - {proposalOption.speakerName}
+                                            </option>
+                                          );
+                                        })}
+                                      </optgroup>
+                                    ) : null}
                                   </select>
                                 </label>
                                 <button
@@ -1188,6 +1237,27 @@ function getSlotLengthClass(talkDuration: number): string {
   }
 
   return 'slot-long';
+}
+
+function createDefaultDurationPreferences(
+  preferredTalkDuration: DurationMinutes,
+): DurationPreferenceMap {
+  return {
+    5: preferredTalkDuration === 5 ? 'top' : 'not_interested',
+    10: preferredTalkDuration === 10 ? 'top' : 'not_interested',
+    15: preferredTalkDuration === 15 ? 'top' : 'not_interested',
+  };
+}
+
+function getProposalPreference(
+  proposal: TalkProposal,
+  talkDuration: DurationMinutes,
+): DurationPreference {
+  if (proposal.durationPreferences) {
+    return proposal.durationPreferences[talkDuration];
+  }
+
+  return proposal.preferredTalkDuration === talkDuration ? 'top' : 'not_interested';
 }
 
 export default App;

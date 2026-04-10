@@ -1,5 +1,9 @@
 export type DurationMinutes = 5 | 10 | 15;
 
+export type DurationPreference = 'top' | 'acceptable' | 'not_interested';
+
+export type DurationPreferenceMap = Record<DurationMinutes, DurationPreference>;
+
 export type TalkProposal = {
   id: string;
   speakerName: string;
@@ -7,6 +11,7 @@ export type TalkProposal = {
   title: string;
   abstract: string;
   preferredTalkDuration: DurationMinutes;
+  durationPreferences?: DurationPreferenceMap;
 };
 
 export type SessionSlot = {
