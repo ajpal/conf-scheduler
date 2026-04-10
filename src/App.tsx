@@ -1,4 +1,5 @@
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { proposalsFromCsv } from './csv';
 import { sampleAgenda, sampleProposals, sampleSessions } from './sampleData';
 import { buildSchedule, formatTime, getScheduledProposalIds, moveItem, TARGET_END } from './schedule';
 import { AgendaItem, SessionItem, TalkProposal } from './types';
@@ -294,12 +295,15 @@ function App() {
     file
       .text()
       .then((text) => {
-        const imported = JSON.parse(text) as TalkProposal[];
-        const normalized = imported.map((proposal) => ({
-          ...proposal,
-          id: proposal.id || `talk-${crypto.randomUUID()}`,
-        }));
-        setProposals(normalized);
+        const isCsv = file.name.toLowerCase().endsWith('.csv');
+        const imported = isCsv
+          ? proposalsFromCsv(text)
+          : (JSON.parse(text) as TalkProposal[]).map((proposal) => ({
+              ...proposal,
+              id: proposal.id || `talk-${crypto.randomUUID()}`,
+            }));
+
+        setProposals(imported);
         setSessions([]);
         setAgenda(
           sampleAgenda.filter(
@@ -308,7 +312,9 @@ function App() {
         );
       })
       .catch(() => {
-        window.alert('Unable to import proposals. Expected a JSON array of talk objects.');
+        window.alert(
+          'Unable to import proposals. Expected either the conference CSV export or a JSON array of talk objects.',
+        );
       })
       .finally(() => {
         event.target.value = '';
@@ -419,8 +425,12 @@ function App() {
             </button>
             <div className="import-row">
               <label className="file-input-label">
-                Import proposals JSON
-                <input type="file" accept="application/json" onChange={handleImportProposals} />
+                Import CSV or JSON
+                <input
+                  type="file"
+                  accept=".csv,application/json,text/csv"
+                  onChange={handleImportProposals}
+                />
               </label>
               <button className="secondary-button" onClick={handleResetDemo}>
                 Restore sample data
