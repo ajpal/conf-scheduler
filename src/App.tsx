@@ -698,7 +698,12 @@ function App() {
               const isScheduled = scheduledProposalIds.has(proposal.id);
 
               return (
-                <article className="proposal-card" key={proposal.id}>
+                <article
+                  className={`proposal-card ${getSlotLengthClass(
+                    proposal.preferredTalkDuration,
+                  )}`}
+                  key={proposal.id}
+                >
                   <div className="proposal-meta">
                     <span className="duration-pill">
                       {proposal.preferredTalkDuration} min preferred
@@ -1171,7 +1176,12 @@ function App() {
               <p>All proposals are currently assigned to session slots.</p>
             ) : (
               unscheduledProposals.map((proposal) => (
-                <article className="unscheduled-card" key={proposal.id}>
+                <article
+                  className={`unscheduled-card ${getSlotLengthClass(
+                    proposal.preferredTalkDuration,
+                  )}`}
+                  key={proposal.id}
+                >
                   <div>
                     <h4>{proposal.title}</h4>
                     <p className="speaker-line">

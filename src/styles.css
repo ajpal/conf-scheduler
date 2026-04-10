@@ -255,6 +255,24 @@ textarea {
   padding: 16px;
 }
 
+.proposal-card.slot-short,
+.unscheduled-card.slot-short {
+  background: rgba(230, 244, 233, 0.98);
+  border-color: rgba(73, 123, 80, 0.24);
+}
+
+.proposal-card.slot-medium,
+.unscheduled-card.slot-medium {
+  background: rgba(251, 243, 205, 0.98);
+  border-color: rgba(173, 139, 44, 0.24);
+}
+
+.proposal-card.slot-long,
+.unscheduled-card.slot-long {
+  background: rgba(248, 226, 204, 0.98);
+  border-color: rgba(183, 108, 43, 0.24);
+}
+
 .proposal-meta,
 .timeline-heading,
 .session-footer,
