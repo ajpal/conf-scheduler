@@ -1,11 +1,7 @@
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { proposalsFromCsv } from './csv';
-import {
-  createDefaultScheduleState,
-  sampleAgenda,
-  sampleProposals,
-  sampleSessions,
-} from './sampleData';
+import bundledProposalCsv from './talk-proposals.csv?raw';
+import { createDefaultScheduleState } from './defaultSchedule';
 import {
   buildSchedule,
   formatTime,
@@ -68,11 +64,14 @@ const initialSessionForm: NewSessionTemplateForm = {
   defaultQaDuration: 0,
 };
 
+const defaultScheduleState = createDefaultScheduleState();
+const bundledProposals = proposalsFromCsv(bundledProposalCsv);
+
 function loadInitialState(): PersistedState {
   const fallback: PersistedState = {
-    proposals: sampleProposals,
-    sessionGroups: sampleSessions,
-    agenda: sampleAgenda,
+    proposals: bundledProposals,
+    sessionGroups: defaultScheduleState.sessionGroups,
+    agenda: defaultScheduleState.agenda,
     targetEnd: TARGET_END,
   };
 
@@ -489,39 +488,17 @@ function App() {
     file
       .text()
       .then((text) => {
-        const isCsv = file.name.toLowerCase().endsWith('.csv');
-        const imported = isCsv
-          ? proposalsFromCsv(text)
-          : (JSON.parse(text) as TalkProposal[]).map((proposal) => ({
-              ...proposal,
-              id: proposal.id || `talk-${crypto.randomUUID()}`,
-              durationPreferences:
-                proposal.durationPreferences ??
-                createDefaultDurationPreferences(proposal.preferredTalkDuration),
-            }));
-
+        const imported = proposalsFromCsv(text);
         setProposals(imported);
         setSessionGroups([]);
-        setAgenda(sampleAgenda.filter((item) => item.type === 'static'));
+        setAgenda(defaultScheduleState.agenda.filter((item) => item.type === 'static'));
       })
       .catch(() => {
-        window.alert(
-          'Unable to import proposals. Expected either the conference CSV export or a JSON array of talk objects.',
-        );
+        window.alert('Unable to import proposals. Expected the conference CSV export.');
       })
       .finally(() => {
         event.target.value = '';
       });
-  }
-
-  function handleResetDemo() {
-    setProposals(sampleProposals);
-    const defaultScheduleState = createDefaultScheduleState();
-    setSessionGroups(defaultScheduleState.sessionGroups);
-    setAgenda(defaultScheduleState.agenda);
-    setTargetEnd(TARGET_END);
-    setSessionForm(initialSessionForm);
-    setProposalForm(initialProposalForm);
   }
 
   function handleResetDefaultSchedule() {
@@ -682,15 +659,15 @@ function App() {
             </button>
             <div className="import-row">
               <label className="file-input-label">
-                Import CSV or JSON
+                Import CSV
                 <input
                   type="file"
-                  accept=".csv,application/json,text/csv"
+                  accept=".csv,text/csv"
                   onChange={handleImportProposals}
                 />
               </label>
-              <button className="secondary-button" onClick={handleResetDemo}>
-                Restore sample data
+              <button className="secondary-button" onClick={() => setProposals(bundledProposals)}>
+                Reload bundled CSV
               </button>
             </div>
           </div>
