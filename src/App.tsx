@@ -1,8 +1,16 @@
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { proposalsFromCsv } from './csv';
 import { sampleAgenda, sampleProposals, sampleSessions } from './sampleData';
-import { buildSchedule, formatTime, getScheduledProposalIds, moveItem, TARGET_END } from './schedule';
-import { AgendaItem, SessionItem, TalkProposal } from './types';
+import {
+  buildSchedule,
+  formatTime,
+  getScheduledProposalIds,
+  getSessionGroupDuration,
+  getSlotDuration,
+  moveItem,
+  TARGET_END,
+} from './schedule';
+import { AgendaItem, SessionGroup, SessionSlot, TalkProposal } from './types';
 
 type NewProposalForm = {
   speakerName: string;
@@ -12,7 +20,25 @@ type NewProposalForm = {
   preferredTalkDuration: '5' | '10' | '15';
 };
 
-const initialForm: NewProposalForm = {
+type NewSessionTemplateForm = {
+  title: string;
+  shortCount: number;
+  mediumCount: number;
+  longCount: number;
+  transitionDuration: number;
+  defaultQaDuration: number;
+};
+
+type PersistedState = {
+  proposals: TalkProposal[];
+  sessionGroups: SessionGroup[];
+  agenda: AgendaItem[];
+  targetEnd: number;
+};
+
+const STORAGE_KEY = 'pnwplse-scheduler-state';
+
+const initialProposalForm: NewProposalForm = {
   speakerName: '',
   speakerAffiliation: '',
   title: '',
@@ -20,24 +46,20 @@ const initialForm: NewProposalForm = {
   preferredTalkDuration: '10',
 };
 
-const STORAGE_KEY = 'pnwplse-scheduler-state';
-
-type PersistedState = {
-  proposals: TalkProposal[];
-  sessions: SessionItem[];
-  agenda: AgendaItem[];
-  defaultQa: number;
-  defaultBuffer: number;
-  targetEnd: number;
+const initialSessionForm: NewSessionTemplateForm = {
+  title: '',
+  shortCount: 2,
+  mediumCount: 0,
+  longCount: 1,
+  transitionDuration: 2,
+  defaultQaDuration: 0,
 };
 
 function loadInitialState(): PersistedState {
   const fallback: PersistedState = {
     proposals: sampleProposals,
-    sessions: sampleSessions,
+    sessionGroups: sampleSessions,
     agenda: sampleAgenda,
-    defaultQa: 0,
-    defaultBuffer: 5,
     targetEnd: TARGET_END,
   };
 
@@ -50,10 +72,8 @@ function loadInitialState(): PersistedState {
     const parsed = JSON.parse(stored) as Partial<PersistedState>;
     return {
       proposals: parsed.proposals ?? fallback.proposals,
-      sessions: parsed.sessions ?? fallback.sessions,
+      sessionGroups: parsed.sessionGroups ?? fallback.sessionGroups,
       agenda: parsed.agenda ?? fallback.agenda,
-      defaultQa: parsed.defaultQa ?? fallback.defaultQa,
-      defaultBuffer: parsed.defaultBuffer ?? fallback.defaultBuffer,
       targetEnd: parsed.targetEnd ?? fallback.targetEnd,
     };
   } catch {
@@ -64,20 +84,22 @@ function loadInitialState(): PersistedState {
 function App() {
   const initialState = useMemo(() => loadInitialState(), []);
   const [proposals, setProposals] = useState<TalkProposal[]>(initialState.proposals);
-  const [sessions, setSessions] = useState<SessionItem[]>(initialState.sessions);
+  const [sessionGroups, setSessionGroups] = useState<SessionGroup[]>(initialState.sessionGroups);
   const [agenda, setAgenda] = useState<AgendaItem[]>(initialState.agenda);
   const [query, setQuery] = useState('');
-  const [form, setForm] = useState<NewProposalForm>(initialForm);
-  const [defaultQa, setDefaultQa] = useState(initialState.defaultQa);
-  const [defaultBuffer, setDefaultBuffer] = useState(initialState.defaultBuffer);
+  const [proposalForm, setProposalForm] = useState(initialProposalForm);
+  const [sessionForm, setSessionForm] = useState(initialSessionForm);
   const [targetEnd, setTargetEnd] = useState(initialState.targetEnd);
 
-  const schedule = useMemo(
-    () => buildSchedule(agenda, sessions, proposals),
-    [agenda, proposals, sessions],
+  const schedule = useMemo(() => buildSchedule(agenda, sessionGroups), [agenda, sessionGroups]);
+  const proposalsById = useMemo(
+    () => new Map(proposals.map((proposal) => [proposal.id, proposal])),
+    [proposals],
   );
-
-  const scheduledProposalIds = useMemo(() => getScheduledProposalIds(sessions), [sessions]);
+  const scheduledProposalIds = useMemo(
+    () => getScheduledProposalIds(sessionGroups),
+    [sessionGroups],
+  );
 
   const unscheduledProposals = useMemo(
     () => proposals.filter((proposal) => !scheduledProposalIds.has(proposal.id)),
@@ -100,31 +122,55 @@ function App() {
 
   const projectedEnd = schedule.length > 0 ? schedule[schedule.length - 1].end : 9 * 60;
   const overflow = projectedEnd - targetEnd;
-  const totalTalkMinutes = sessions.reduce((total, session) => total + session.talkDuration, 0);
-  const totalQaMinutes = sessions.reduce((total, session) => total + session.qaDuration, 0);
-  const totalBufferMinutes = sessions.reduce((total, session) => total + session.bufferDuration, 0);
+  const totalTalkMinutes = sessionGroups.reduce(
+    (total, sessionGroup) =>
+      total +
+      sessionGroup.slots.reduce((slotTotal, slot) => slotTotal + slot.talkDuration, 0),
+    0,
+  );
+  const totalQaMinutes = sessionGroups.reduce(
+    (total, sessionGroup) =>
+      total + sessionGroup.slots.reduce((slotTotal, slot) => slotTotal + slot.qaDuration, 0),
+    0,
+  );
+  const totalTransitionMinutes = sessionGroups.reduce(
+    (total, sessionGroup) =>
+      total +
+      (sessionGroup.slots.length > 1
+        ? (sessionGroup.slots.length - 1) * sessionGroup.transitionDuration
+        : 0),
+    0,
+  );
 
   useEffect(() => {
     const nextState: PersistedState = {
       proposals,
-      sessions,
+      sessionGroups,
       agenda,
-      defaultQa,
-      defaultBuffer,
       targetEnd,
     };
 
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
-  }, [agenda, defaultBuffer, defaultQa, proposals, sessions, targetEnd]);
+  }, [agenda, proposals, sessionGroups, targetEnd]);
 
-  function updateForm<K extends keyof NewProposalForm>(key: K, value: NewProposalForm[K]) {
-    setForm((current) => ({ ...current, [key]: value }));
+  function updateProposalForm<K extends keyof NewProposalForm>(
+    key: K,
+    value: NewProposalForm[K],
+  ) {
+    setProposalForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function updateSessionForm<K extends keyof NewSessionTemplateForm>(
+    key: K,
+    value: NewSessionTemplateForm[K],
+  ) {
+    setSessionForm((current) => ({ ...current, [key]: value }));
   }
 
   function handleAddProposal() {
-    const speakerName = form.speakerName.trim();
-    const title = form.title.trim();
-    const abstract = form.abstract.trim();
+    const speakerName = proposalForm.speakerName.trim();
+    const title = proposalForm.title.trim();
+    const abstract = proposalForm.abstract.trim();
 
     if (!speakerName || !title || !abstract) {
       return;
@@ -133,26 +179,62 @@ function App() {
     const proposal: TalkProposal = {
       id: `talk-${crypto.randomUUID()}`,
       speakerName,
-      speakerAffiliation: form.speakerAffiliation.trim(),
+      speakerAffiliation: proposalForm.speakerAffiliation.trim(),
       title,
       abstract,
-      preferredTalkDuration: Number(form.preferredTalkDuration) as 5 | 10 | 15,
+      preferredTalkDuration: Number(proposalForm.preferredTalkDuration) as 5 | 10 | 15,
     };
 
     setProposals((current) => [proposal, ...current]);
-    setForm(initialForm);
+    setProposalForm(initialProposalForm);
   }
 
-  function handleAddToAgenda(proposal: TalkProposal) {
-    const sessionId = `session-${crypto.randomUUID()}`;
-    const agendaId = `agenda-${crypto.randomUUID()}`;
+  function buildSlotsFromTemplate(form: NewSessionTemplateForm): SessionSlot[] {
+    const slots: SessionSlot[] = [];
 
-    const nextSession: SessionItem = {
-      id: sessionId,
-      proposalId: proposal.id,
-      talkDuration: proposal.preferredTalkDuration,
-      qaDuration: defaultQa,
-      bufferDuration: defaultBuffer,
+    for (let count = 0; count < form.longCount; count += 1) {
+      slots.push({
+        id: `slot-${crypto.randomUUID()}`,
+        proposalId: null,
+        talkDuration: 15,
+        qaDuration: form.defaultQaDuration,
+      });
+    }
+
+    for (let count = 0; count < form.mediumCount; count += 1) {
+      slots.push({
+        id: `slot-${crypto.randomUUID()}`,
+        proposalId: null,
+        talkDuration: 10,
+        qaDuration: form.defaultQaDuration,
+      });
+    }
+
+    for (let count = 0; count < form.shortCount; count += 1) {
+      slots.push({
+        id: `slot-${crypto.randomUUID()}`,
+        proposalId: null,
+        talkDuration: 5,
+        qaDuration: form.defaultQaDuration,
+      });
+    }
+
+    return slots;
+  }
+
+  function handleAddSessionGroup() {
+    const slots = buildSlotsFromTemplate(sessionForm);
+    if (slots.length === 0) {
+      return;
+    }
+
+    const sessionGroupId = `session-group-${crypto.randomUUID()}`;
+    const agendaId = `agenda-${crypto.randomUUID()}`;
+    const nextSessionGroup: SessionGroup = {
+      id: sessionGroupId,
+      title: sessionForm.title.trim() || `Session ${sessionGroups.length + 1}`,
+      transitionDuration: sessionForm.transitionDuration,
+      slots,
     };
 
     const wrapUpIndex = agenda.findIndex(
@@ -162,30 +244,92 @@ function App() {
     const nextAgenda = [...agenda];
     nextAgenda.splice(insertIndex, 0, {
       id: agendaId,
-      type: 'talk',
-      sessionId,
+      type: 'session',
+      sessionGroupId,
     });
 
-    setSessions((current) => [...current, nextSession]);
+    setSessionGroups((current) => [...current, nextSessionGroup]);
     setAgenda(nextAgenda);
   }
 
-  function handleSessionChange(
-    sessionId: string,
-    field: keyof Pick<SessionItem, 'talkDuration' | 'qaDuration' | 'bufferDuration'>,
-    value: number,
+  function handleAssignProposal(
+    sessionGroupId: string,
+    slotId: string,
+    proposalId: string | null,
   ) {
-    setSessions((current) =>
-      current.map((session) =>
-        session.id === sessionId ? { ...session, [field]: value } : session,
+    setSessionGroups((current) =>
+      current.map((sessionGroup) => {
+        if (sessionGroup.id !== sessionGroupId) {
+          return sessionGroup;
+        }
+
+        return {
+          ...sessionGroup,
+          slots: sessionGroup.slots.map((slot) => {
+            if (slot.id !== slotId) {
+              return slot;
+            }
+
+            if (proposalId === null) {
+              return { ...slot, proposalId: null };
+            }
+
+            const proposal = proposals.find((candidate) => candidate.id === proposalId);
+            if (!proposal) {
+              return slot;
+            }
+
+            return {
+              ...slot,
+              proposalId,
+              talkDuration: proposal.preferredTalkDuration,
+            };
+          }),
+        };
+      }),
+    );
+  }
+
+  function handleAssignToOpenSlot(proposal: TalkProposal) {
+    for (const sessionGroup of sessionGroups) {
+      const openSlot = sessionGroup.slots.find((slot) => slot.proposalId === null);
+      if (openSlot) {
+        handleAssignProposal(sessionGroup.id, openSlot.id, proposal.id);
+        return;
+      }
+    }
+  }
+
+  function handleSessionGroupChange(
+    sessionGroupId: string,
+    field: keyof Pick<SessionGroup, 'title' | 'transitionDuration'>,
+    value: string | number,
+  ) {
+    setSessionGroups((current) =>
+      current.map((sessionGroup) =>
+        sessionGroup.id === sessionGroupId
+          ? { ...sessionGroup, [field]: value }
+          : sessionGroup,
       ),
     );
   }
 
-  function handleStaticDurationChange(itemId: string, duration: number) {
-    setAgenda((current) =>
-      current.map((item) =>
-        item.id === itemId && item.type === 'static' ? { ...item, duration } : item,
+  function handleSlotChange(
+    sessionGroupId: string,
+    slotId: string,
+    field: keyof Pick<SessionSlot, 'talkDuration' | 'qaDuration'>,
+    value: number,
+  ) {
+    setSessionGroups((current) =>
+      current.map((sessionGroup) =>
+        sessionGroup.id === sessionGroupId
+          ? {
+              ...sessionGroup,
+              slots: sessionGroup.slots.map((slot) =>
+                slot.id === slotId ? { ...slot, [field]: value } : slot,
+              ),
+            }
+          : sessionGroup,
       ),
     );
   }
@@ -230,11 +374,63 @@ function App() {
     return true;
   }
 
-  function handleRemoveSession(sessionId: string) {
-    setSessions((current) => current.filter((session) => session.id !== sessionId));
+  function handleStaticDurationChange(itemId: string, duration: number) {
     setAgenda((current) =>
-      current.filter((item) => !(item.type === 'talk' && item.sessionId === sessionId)),
+      current.map((item) =>
+        item.id === itemId && item.type === 'static' ? { ...item, duration } : item,
+      ),
     );
+  }
+
+  function handleRemoveSessionGroup(sessionGroupId: string) {
+    setSessionGroups((current) =>
+      current.filter((sessionGroup) => sessionGroup.id !== sessionGroupId),
+    );
+    setAgenda((current) =>
+      current.filter(
+        (item) => !(item.type === 'session' && item.sessionGroupId === sessionGroupId),
+      ),
+    );
+  }
+
+  function handleImportProposals(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    file
+      .text()
+      .then((text) => {
+        const isCsv = file.name.toLowerCase().endsWith('.csv');
+        const imported = isCsv
+          ? proposalsFromCsv(text)
+          : (JSON.parse(text) as TalkProposal[]).map((proposal) => ({
+              ...proposal,
+              id: proposal.id || `talk-${crypto.randomUUID()}`,
+            }));
+
+        setProposals(imported);
+        setSessionGroups([]);
+        setAgenda(sampleAgenda.filter((item) => item.type === 'static'));
+      })
+      .catch(() => {
+        window.alert(
+          'Unable to import proposals. Expected either the conference CSV export or a JSON array of talk objects.',
+        );
+      })
+      .finally(() => {
+        event.target.value = '';
+      });
+  }
+
+  function handleResetDemo() {
+    setProposals(sampleProposals);
+    setSessionGroups(sampleSessions);
+    setAgenda(sampleAgenda);
+    setTargetEnd(TARGET_END);
+    setSessionForm(initialSessionForm);
+    setProposalForm(initialProposalForm);
   }
 
   function handleTargetEndChange(event: ChangeEvent<HTMLInputElement>) {
@@ -261,15 +457,21 @@ function App() {
               duration: item.duration,
             }
           : {
-              type: 'talk',
-              title: item.proposal.title,
-              speakerName: item.proposal.speakerName,
-              speakerAffiliation: item.proposal.speakerAffiliation,
+              type: 'session',
+              title: item.sessionGroup.title,
               start: formatTime(item.start),
               end: formatTime(item.end),
-              talkDuration: item.session.talkDuration,
-              qaDuration: item.session.qaDuration,
-              bufferDuration: item.session.bufferDuration,
+              transitionDuration: item.sessionGroup.transitionDuration,
+              slots: item.sessionGroup.slots.map((slot) => {
+                const proposal = slot.proposalId ? proposalsById.get(slot.proposalId) : null;
+                return {
+                  title: proposal ? proposal.title : 'Unassigned session slot',
+                  speakerName: proposal ? proposal.speakerName : '',
+                  speakerAffiliation: proposal ? proposal.speakerAffiliation : '',
+                  talkDuration: slot.talkDuration,
+                  qaDuration: slot.qaDuration,
+                };
+              }),
             },
       ),
       unscheduledProposals,
@@ -286,59 +488,15 @@ function App() {
     URL.revokeObjectURL(url);
   }
 
-  function handleImportProposals(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-
-    file
-      .text()
-      .then((text) => {
-        const isCsv = file.name.toLowerCase().endsWith('.csv');
-        const imported = isCsv
-          ? proposalsFromCsv(text)
-          : (JSON.parse(text) as TalkProposal[]).map((proposal) => ({
-              ...proposal,
-              id: proposal.id || `talk-${crypto.randomUUID()}`,
-            }));
-
-        setProposals(imported);
-        setSessions([]);
-        setAgenda(
-          sampleAgenda.filter(
-            (item) => item.type === 'static',
-          ),
-        );
-      })
-      .catch(() => {
-        window.alert(
-          'Unable to import proposals. Expected either the conference CSV export or a JSON array of talk objects.',
-        );
-      })
-      .finally(() => {
-        event.target.value = '';
-      });
-  }
-
-  function handleResetDemo() {
-    setProposals(sampleProposals);
-    setSessions(sampleSessions);
-    setAgenda(sampleAgenda);
-    setDefaultQa(0);
-    setDefaultBuffer(5);
-    setTargetEnd(TARGET_END);
-  }
-
   return (
     <div className="app-shell">
       <header className="hero">
         <div>
           <p className="eyebrow">Single-track conference planner</p>
-          <h1>Build a one-day agenda from short talk proposals.</h1>
+          <h1>Compose sessions first, then assign talks into them.</h1>
           <p className="hero-copy">
-            Add proposals, place them into the timeline, and tune talk, Q&amp;A, and
-            transition time until the day fits.
+            Define a session shape like one long talk and two short talks, tune shared
+            transitions, and fill each blank slot from the proposal pool.
           </p>
         </div>
         <div className="hero-card">
@@ -375,40 +533,40 @@ function App() {
               <label>
                 Speaker name
                 <input
-                  value={form.speakerName}
-                  onChange={(event) => updateForm('speakerName', event.target.value)}
+                  value={proposalForm.speakerName}
+                  onChange={(event) => updateProposalForm('speakerName', event.target.value)}
                 />
               </label>
               <label>
                 Affiliation
                 <input
-                  value={form.speakerAffiliation}
+                  value={proposalForm.speakerAffiliation}
                   onChange={(event) =>
-                    updateForm('speakerAffiliation', event.target.value)
+                    updateProposalForm('speakerAffiliation', event.target.value)
                   }
                 />
               </label>
               <label className="wide">
                 Title
                 <input
-                  value={form.title}
-                  onChange={(event) => updateForm('title', event.target.value)}
+                  value={proposalForm.title}
+                  onChange={(event) => updateProposalForm('title', event.target.value)}
                 />
               </label>
               <label className="wide">
                 Abstract
                 <textarea
                   rows={4}
-                  value={form.abstract}
-                  onChange={(event) => updateForm('abstract', event.target.value)}
+                  value={proposalForm.abstract}
+                  onChange={(event) => updateProposalForm('abstract', event.target.value)}
                 />
               </label>
               <label>
                 Preferred talk length
                 <select
-                  value={form.preferredTalkDuration}
+                  value={proposalForm.preferredTalkDuration}
                   onChange={(event) =>
-                    updateForm(
+                    updateProposalForm(
                       'preferredTalkDuration',
                       event.target.value as NewProposalForm['preferredTalkDuration'],
                     )
@@ -449,22 +607,25 @@ function App() {
                       {proposal.preferredTalkDuration} min preferred
                     </span>
                     {isScheduled ? (
-                      <span className="scheduled-pill">On agenda</span>
+                      <span className="scheduled-pill">Assigned</span>
                     ) : (
                       <button
                         className="secondary-button"
-                        onClick={() => handleAddToAgenda(proposal)}
+                        onClick={() => handleAssignToOpenSlot(proposal)}
+                        disabled={
+                          !sessionGroups.some((sessionGroup) =>
+                            sessionGroup.slots.some((slot) => slot.proposalId === null),
+                          )
+                        }
                       >
-                        Add to agenda
+                        Fill open slot
                       </button>
                     )}
                   </div>
                   <h3>{proposal.title}</h3>
                   <p className="speaker-line">
                     {proposal.speakerName}
-                    {proposal.speakerAffiliation
-                      ? `, ${proposal.speakerAffiliation}`
-                      : ''}
+                    {proposal.speakerAffiliation ? `, ${proposal.speakerAffiliation}` : ''}
                   </p>
                   <p className="abstract-copy">{proposal.abstract}</p>
                 </article>
@@ -477,7 +638,7 @@ function App() {
           <div className="panel-header">
             <div>
               <p className="section-kicker">Agenda Builder</p>
-              <h2>Single-track timeline</h2>
+              <h2>Session-based timeline</h2>
             </div>
             <button className="primary-button" onClick={handleExport}>
               Export schedule
@@ -485,26 +646,6 @@ function App() {
           </div>
 
           <div className="settings-row">
-            <label>
-              Default Q&amp;A
-              <input
-                type="number"
-                min={0}
-                step={5}
-                value={defaultQa}
-                onChange={(event) => setDefaultQa(Number(event.target.value))}
-              />
-            </label>
-            <label>
-              Default buffer
-              <input
-                type="number"
-                min={0}
-                step={5}
-                value={defaultBuffer}
-                onChange={(event) => setDefaultBuffer(Number(event.target.value))}
-              />
-            </label>
             <label>
               Target end time
               <input
@@ -515,6 +656,78 @@ function App() {
                 onChange={handleTargetEndChange}
               />
             </label>
+          </div>
+
+          <div className="session-template-card">
+            <h3>Create session template</h3>
+            <div className="form-grid session-template-grid">
+              <label className="wide">
+                Session title
+                <input
+                  value={sessionForm.title}
+                  onChange={(event) => updateSessionForm('title', event.target.value)}
+                  placeholder="Research Session B"
+                />
+              </label>
+              <label>
+                Long talks (15)
+                <input
+                  type="number"
+                  min={0}
+                  value={sessionForm.longCount}
+                  onChange={(event) =>
+                    updateSessionForm('longCount', Number(event.target.value))
+                  }
+                />
+              </label>
+              <label>
+                Medium talks (10)
+                <input
+                  type="number"
+                  min={0}
+                  value={sessionForm.mediumCount}
+                  onChange={(event) =>
+                    updateSessionForm('mediumCount', Number(event.target.value))
+                  }
+                />
+              </label>
+              <label>
+                Short talks (5)
+                <input
+                  type="number"
+                  min={0}
+                  value={sessionForm.shortCount}
+                  onChange={(event) =>
+                    updateSessionForm('shortCount', Number(event.target.value))
+                  }
+                />
+              </label>
+              <label>
+                Transition between talks
+                <input
+                  type="number"
+                  min={0}
+                  value={sessionForm.transitionDuration}
+                  onChange={(event) =>
+                    updateSessionForm('transitionDuration', Number(event.target.value))
+                  }
+                />
+              </label>
+              <label>
+                Default Q&amp;A per talk
+                <input
+                  type="number"
+                  min={0}
+                  value={sessionForm.defaultQaDuration}
+                  onChange={(event) =>
+                    updateSessionForm('defaultQaDuration', Number(event.target.value))
+                  }
+                />
+              </label>
+            </div>
+            <button className="primary-button" onClick={handleAddSessionGroup}>
+              Add session
+            </button>
           </div>
 
           <div className="timeline">
@@ -569,8 +782,11 @@ function App() {
                 );
               }
 
+              const sessionStart = item.start;
+              let slotCursor = sessionStart;
+
               return (
-                <article className="timeline-card talk-card" key={item.id}>
+                <article className="timeline-card session-card" key={item.id}>
                   <div className="time-column">
                     <strong>{formatTime(item.start)}</strong>
                     <span>{formatTime(item.end)}</span>
@@ -578,13 +794,11 @@ function App() {
                   <div className="timeline-body">
                     <div className="timeline-heading">
                       <div>
-                        <p className="item-tag">Talk session</p>
-                        <h3>{item.proposal.title}</h3>
+                        <p className="item-tag">Session</p>
+                        <h3>{item.sessionGroup.title}</h3>
                         <p className="speaker-line">
-                          {item.proposal.speakerName}
-                          {item.proposal.speakerAffiliation
-                            ? `, ${item.proposal.speakerAffiliation}`
-                            : ''}
+                          {item.sessionGroup.slots.length} talks, {item.sessionGroup.transitionDuration}
+                          {' '}min transition between talks
                         </p>
                       </div>
                       <div className="move-controls">
@@ -603,51 +817,30 @@ function App() {
                       </div>
                     </div>
 
-                    <div className="session-grid">
-                      <label className="inline-field">
-                        Talk
-                        <select
-                          value={item.session.talkDuration}
-                          onChange={(event) =>
-                            handleSessionChange(
-                              item.session.id,
-                              'talkDuration',
-                              Number(event.target.value),
-                            )
-                          }
-                        >
-                          <option value={5}>5 min</option>
-                          <option value={10}>10 min</option>
-                          <option value={15}>15 min</option>
-                        </select>
-                      </label>
-                      <label className="inline-field">
-                        Q&amp;A
+                    <div className="session-group-controls">
+                      <label>
+                        Session title
                         <input
-                          type="number"
-                          min={0}
-                          step={5}
-                          value={item.session.qaDuration}
+                          value={item.sessionGroup.title}
                           onChange={(event) =>
-                            handleSessionChange(
-                              item.session.id,
-                              'qaDuration',
-                              Number(event.target.value),
+                            handleSessionGroupChange(
+                              item.sessionGroup.id,
+                              'title',
+                              event.target.value,
                             )
                           }
                         />
                       </label>
                       <label className="inline-field">
-                        Buffer
+                        Transition
                         <input
                           type="number"
                           min={0}
-                          step={5}
-                          value={item.session.bufferDuration}
+                          value={item.sessionGroup.transitionDuration}
                           onChange={(event) =>
-                            handleSessionChange(
-                              item.session.id,
-                              'bufferDuration',
+                            handleSessionGroupChange(
+                              item.sessionGroup.id,
+                              'transitionDuration',
                               Number(event.target.value),
                             )
                           }
@@ -655,13 +848,115 @@ function App() {
                       </label>
                     </div>
 
+                    <div className="nested-slot-list">
+                      {item.sessionGroup.slots.map((slot, slotIndex) => {
+                        const slotStart = slotCursor;
+                        const slotEnd = slotStart + getSlotDuration(slot);
+                        slotCursor =
+                          slotEnd +
+                          (slotIndex < item.sessionGroup.slots.length - 1
+                            ? item.sessionGroup.transitionDuration
+                            : 0);
+                        const proposal = slot.proposalId
+                          ? proposalsById.get(slot.proposalId) ?? null
+                          : null;
+
+                        return (
+                          <div className="nested-slot-card" key={slot.id}>
+                            <div className="nested-slot-time">
+                              <strong>{formatTime(slotStart)}</strong>
+                              <span>{formatTime(slotEnd)}</span>
+                            </div>
+                            <div className="nested-slot-body">
+                              <label className="assignment-field">
+                                Proposal
+                                <select
+                                  value={slot.proposalId ?? ''}
+                                  onChange={(event) =>
+                                    handleAssignProposal(
+                                      item.sessionGroup.id,
+                                      slot.id,
+                                      event.target.value === '' ? null : event.target.value,
+                                    )
+                                  }
+                                >
+                                  <option value="">Unassigned</option>
+                                  {proposals.map((proposalOption) => {
+                                    const assignedElsewhere =
+                                      proposalOption.id !== slot.proposalId &&
+                                      scheduledProposalIds.has(proposalOption.id);
+
+                                    return (
+                                      <option
+                                        key={proposalOption.id}
+                                        value={proposalOption.id}
+                                        disabled={assignedElsewhere}
+                                      >
+                                        {proposalOption.title} - {proposalOption.speakerName}
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                              </label>
+                              <div className="slot-meta-grid">
+                                <label className="inline-field">
+                                  Talk
+                                  <select
+                                    value={slot.talkDuration}
+                                    onChange={(event) =>
+                                      handleSlotChange(
+                                        item.sessionGroup.id,
+                                        slot.id,
+                                        'talkDuration',
+                                        Number(event.target.value),
+                                      )
+                                    }
+                                  >
+                                    <option value={5}>5 min</option>
+                                    <option value={10}>10 min</option>
+                                    <option value={15}>15 min</option>
+                                  </select>
+                                </label>
+                                <label className="inline-field">
+                                  Q&amp;A
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={5}
+                                    value={slot.qaDuration}
+                                    onChange={(event) =>
+                                      handleSlotChange(
+                                        item.sessionGroup.id,
+                                        slot.id,
+                                        'qaDuration',
+                                        Number(event.target.value),
+                                      )
+                                    }
+                                  />
+                                </label>
+                              </div>
+                              <p className="speaker-line">
+                                {proposal
+                                  ? `${proposal.speakerName}${
+                                      proposal.speakerAffiliation
+                                        ? `, ${proposal.speakerAffiliation}`
+                                        : ''
+                                    }`
+                                  : 'Blank slot'}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
                     <div className="session-footer">
-                      <span>Total session: {item.duration} min</span>
+                      <span>Total session: {getSessionGroupDuration(item.sessionGroup)} min</span>
                       <button
                         className="secondary-button danger-button"
-                        onClick={() => handleRemoveSession(item.session.id)}
+                        onClick={() => handleRemoveSessionGroup(item.sessionGroup.id)}
                       >
-                        Remove
+                        Remove session
                       </button>
                     </div>
                   </div>
@@ -680,10 +975,10 @@ function App() {
           </div>
 
           <div className="summary-grid">
-            <Stat label="Scheduled talks" value={String(sessions.length)} />
+            <Stat label="Sessions" value={`${sessionGroups.length}`} />
             <Stat label="Talk minutes" value={`${totalTalkMinutes} min`} />
             <Stat label="Q&A minutes" value={`${totalQaMinutes} min`} />
-            <Stat label="Buffer minutes" value={`${totalBufferMinutes} min`} />
+            <Stat label="Transition minutes" value={`${totalTransitionMinutes} min`} />
           </div>
 
           <div className="summary-callout">
@@ -696,9 +991,9 @@ function App() {
           </div>
 
           <div className="unscheduled-list">
-            <h3>Unscheduled proposals</h3>
+            <h3>Unassigned proposals</h3>
             {unscheduledProposals.length === 0 ? (
-              <p>All proposals are currently on the agenda.</p>
+              <p>All proposals are currently assigned to session slots.</p>
             ) : (
               unscheduledProposals.map((proposal) => (
                 <article className="unscheduled-card" key={proposal.id}>
@@ -706,16 +1001,19 @@ function App() {
                     <h4>{proposal.title}</h4>
                     <p className="speaker-line">
                       {proposal.speakerName}
-                      {proposal.speakerAffiliation
-                        ? `, ${proposal.speakerAffiliation}`
-                        : ''}
+                      {proposal.speakerAffiliation ? `, ${proposal.speakerAffiliation}` : ''}
                     </p>
                   </div>
                   <button
                     className="secondary-button"
-                    onClick={() => handleAddToAgenda(proposal)}
+                    onClick={() => handleAssignToOpenSlot(proposal)}
+                    disabled={
+                      !sessionGroups.some((sessionGroup) =>
+                        sessionGroup.slots.some((slot) => slot.proposalId === null),
+                      )
+                    }
                   >
-                    Schedule
+                    Fill open slot
                   </button>
                 </article>
               ))

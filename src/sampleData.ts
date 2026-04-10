@@ -1,4 +1,4 @@
-import { AgendaItem, SessionItem, TalkProposal } from './types';
+import { AgendaItem, SessionGroup, TalkProposal } from './types';
 
 export const sampleProposals: TalkProposal[] = [
   {
@@ -57,20 +57,44 @@ export const sampleProposals: TalkProposal[] = [
   },
 ];
 
-export const sampleSessions: SessionItem[] = [
+export const sampleSessions: SessionGroup[] = [
   {
-    id: 'session-1',
-    proposalId: 'talk-1',
-    talkDuration: 10,
-    qaDuration: 5,
-    bufferDuration: 5,
+    id: 'session-group-1',
+    title: 'Research Session A',
+    transitionDuration: 5,
+    slots: [
+      {
+        id: 'slot-1',
+        proposalId: 'talk-1',
+        talkDuration: 10,
+        qaDuration: 5,
+      },
+      {
+        id: 'slot-2',
+        proposalId: 'talk-2',
+        talkDuration: 15,
+        qaDuration: 0,
+      },
+    ],
   },
   {
-    id: 'session-2',
-    proposalId: 'talk-2',
-    talkDuration: 15,
-    qaDuration: 0,
-    bufferDuration: 5,
+    id: 'session-group-2',
+    title: 'Lightning Session',
+    transitionDuration: 2,
+    slots: [
+      {
+        id: 'slot-3',
+        proposalId: null,
+        talkDuration: 5,
+        qaDuration: 0,
+      },
+      {
+        id: 'slot-4',
+        proposalId: null,
+        talkDuration: 5,
+        qaDuration: 0,
+      },
+    ],
   },
 ];
 
@@ -92,14 +116,14 @@ export const sampleAgenda: AgendaItem[] = [
     fixedStart: 10 * 60,
   },
   {
-    id: 'agenda-session-1',
-    type: 'talk',
-    sessionId: 'session-1',
+    id: 'agenda-session-group-1',
+    type: 'session',
+    sessionGroupId: 'session-group-1',
   },
   {
-    id: 'agenda-session-2',
-    type: 'talk',
-    sessionId: 'session-2',
+    id: 'agenda-session-group-2',
+    type: 'session',
+    sessionGroupId: 'session-group-2',
   },
   {
     id: 'block-lunch',

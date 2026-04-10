@@ -128,6 +128,25 @@ button {
   margin-bottom: 20px;
 }
 
+.agenda-actions {
+  margin-bottom: 16px;
+}
+
+.session-template-card {
+  margin-bottom: 18px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(241, 233, 219, 0.7);
+}
+
+.session-template-card h3 {
+  margin-top: 0;
+}
+
+.session-template-grid {
+  margin-bottom: 12px;
+}
+
 .import-row {
   margin-top: 12px;
   display: flex;
@@ -299,6 +318,10 @@ textarea {
   gap: 18px;
 }
 
+.session-card {
+  background: rgba(249, 246, 239, 0.92);
+}
+
 .time-column {
   position: relative;
   z-index: 1;
@@ -336,6 +359,60 @@ textarea {
 
 .session-footer {
   align-items: center;
+}
+
+.slot-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.assignment-field {
+  min-width: 240px;
+}
+
+.session-group-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px;
+  gap: 12px;
+}
+
+.nested-slot-list {
+  display: grid;
+  gap: 12px;
+}
+
+.nested-slot-card {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 252, 247, 0.92);
+  border: 1px solid rgba(85, 68, 53, 0.1);
+}
+
+.nested-slot-time {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.nested-slot-time span {
+  color: #726456;
+  font-size: 0.85rem;
+}
+
+.nested-slot-body {
+  display: grid;
+  gap: 10px;
+}
+
+.slot-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 12px;
 }
 
 .stat-card {
@@ -381,5 +458,10 @@ textarea {
 
   .timeline::before {
     display: none;
+  }
+
+  .nested-slot-card,
+  .session-group-controls {
+    grid-template-columns: 1fr;
   }
 }

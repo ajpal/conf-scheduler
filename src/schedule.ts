@@ -1,8 +1,8 @@
 import {
   AgendaItem,
   ScheduledAgendaItem,
-  SessionItem,
-  TalkProposal,
+  SessionGroup,
+  SessionSlot,
 } from './types';
 
 export const DAY_START = 9 * 60;
@@ -17,17 +17,29 @@ export function formatTime(totalMinutes: number): string {
   return `${hours12}:${minutes.toString().padStart(2, '0')} ${suffix}`;
 }
 
-export function getSessionDuration(session: SessionItem): number {
-  return session.talkDuration + session.qaDuration + session.bufferDuration;
+export function getSlotDuration(slot: SessionSlot): number {
+  return slot.talkDuration + slot.qaDuration;
+}
+
+export function getSessionGroupDuration(sessionGroup: SessionGroup): number {
+  const talkTime = sessionGroup.slots.reduce(
+    (total, slot) => total + getSlotDuration(slot),
+    0,
+  );
+  const transitions =
+    sessionGroup.slots.length > 1
+      ? (sessionGroup.slots.length - 1) * sessionGroup.transitionDuration
+      : 0;
+  return talkTime + transitions;
 }
 
 export function buildSchedule(
   agenda: AgendaItem[],
-  sessions: SessionItem[],
-  proposals: TalkProposal[],
+  sessionGroups: SessionGroup[],
 ): ScheduledAgendaItem[] {
-  const sessionsById = new Map(sessions.map((session) => [session.id, session]));
-  const proposalsById = new Map(proposals.map((proposal) => [proposal.id, proposal]));
+  const sessionGroupsById = new Map(
+    sessionGroups.map((sessionGroup) => [sessionGroup.id, sessionGroup]),
+  );
   const scheduled: ScheduledAgendaItem[] = [];
   let cursor = DAY_START;
 
@@ -48,37 +60,36 @@ export function buildSchedule(
       continue;
     }
 
-    const session = sessionsById.get(item.sessionId);
-    if (!session) {
+    const sessionGroup = sessionGroupsById.get(item.sessionGroupId);
+    if (!sessionGroup) {
       continue;
     }
 
-    const proposal = proposalsById.get(session.proposalId);
-    if (!proposal) {
-      continue;
-    }
-
-    const duration = getSessionDuration(session);
+    const duration = getSessionGroupDuration(sessionGroup);
     const start = cursor;
     const end = start + duration;
     cursor = end;
 
     scheduled.push({
       id: item.id,
-      type: 'talk',
+      type: 'session',
       start,
       end,
       duration,
-      session,
-      proposal,
+      sessionGroup,
     });
   }
 
   return scheduled;
 }
 
-export function getScheduledProposalIds(sessions: SessionItem[]): Set<string> {
-  return new Set(sessions.map((session) => session.proposalId));
+export function getScheduledProposalIds(sessionGroups: SessionGroup[]): Set<string> {
+  return new Set(
+    sessionGroups
+      .flatMap((sessionGroup) => sessionGroup.slots)
+      .map((slot) => slot.proposalId)
+      .filter((proposalId): proposalId is string => proposalId !== null),
+  );
 }
 
 export function moveItem<T>(items: T[], fromIndex: number, toIndex: number): T[] {

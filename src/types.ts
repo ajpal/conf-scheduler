@@ -9,12 +9,18 @@ export type TalkProposal = {
   preferredTalkDuration: DurationMinutes;
 };
 
-export type SessionItem = {
+export type SessionSlot = {
   id: string;
-  proposalId: string;
+  proposalId: string | null;
   talkDuration: number;
   qaDuration: number;
-  bufferDuration: number;
+};
+
+export type SessionGroup = {
+  id: string;
+  title: string;
+  transitionDuration: number;
+  slots: SessionSlot[];
 };
 
 export type StaticBlockKind = 'breakfast' | 'opening' | 'lunch' | 'wrapUp';
@@ -31,8 +37,8 @@ export type StaticAgendaItem = {
 
 export type TalkAgendaItem = {
   id: string;
-  type: 'talk';
-  sessionId: string;
+  type: 'session';
+  sessionGroupId: string;
 };
 
 export type AgendaItem = StaticAgendaItem | TalkAgendaItem;
@@ -49,10 +55,9 @@ export type ScheduledAgendaItem =
     }
   | {
       id: string;
-      type: 'talk';
+      type: 'session';
       start: number;
       end: number;
       duration: number;
-      session: SessionItem;
-      proposal: TalkProposal;
+      sessionGroup: SessionGroup;
     };
