@@ -4,7 +4,6 @@ import {
   scheduleStateFromCsv,
   serializeScheduleToCsv,
 } from './csv';
-import bundledProposalCsv from './talk-proposals.csv?raw';
 import { createDefaultScheduleState } from './defaultSchedule';
 import {
   buildSchedule,
@@ -69,11 +68,10 @@ const initialSessionForm: NewSessionTemplateForm = {
 };
 
 const defaultScheduleState = createDefaultScheduleState();
-const bundledProposals = proposalsFromCsv(bundledProposalCsv);
 
 function loadInitialState(): PersistedState {
   const fallback: PersistedState = {
-    proposals: bundledProposals,
+    proposals: [],
     sessionGroups: defaultScheduleState.sessionGroups,
     agenda: defaultScheduleState.agenda,
     targetEnd: TARGET_END,
