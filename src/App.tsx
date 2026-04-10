@@ -334,7 +334,16 @@ function App() {
     );
   }
 
-  function handleMoveAgendaItem(index: number, direction: -1 | 1) {
+  function findAgendaIndex(itemId: string): number {
+    return agenda.findIndex((item) => item.id === itemId);
+  }
+
+  function handleMoveAgendaItem(itemId: string, direction: -1 | 1) {
+    const index = findAgendaIndex(itemId);
+    if (index < 0) {
+      return;
+    }
+
     const nextIndex = index + direction;
     if (nextIndex < 0 || nextIndex >= agenda.length) {
       return;
@@ -354,7 +363,12 @@ function App() {
     setAgenda((items) => moveItem(items, index, nextIndex));
   }
 
-  function canMoveAgendaItem(index: number, direction: -1 | 1): boolean {
+  function canMoveAgendaItem(itemId: string, direction: -1 | 1): boolean {
+    const index = findAgendaIndex(itemId);
+    if (index < 0) {
+      return false;
+    }
+
     const nextIndex = index + direction;
     if (nextIndex < 0 || nextIndex >= agenda.length) {
       return false;
@@ -731,9 +745,8 @@ function App() {
           </div>
 
           <div className="timeline">
-            {schedule.map((item, index) => {
+            {schedule.map((item) => {
               if (item.type === 'static') {
-                const staticAgendaItem = agenda[index];
                 return (
                   <article className="timeline-card static-card" key={item.id}>
                     <div className="time-column">
@@ -748,14 +761,14 @@ function App() {
                         </div>
                         <div className="move-controls">
                           <button
-                            onClick={() => handleMoveAgendaItem(index, -1)}
-                            disabled={!canMoveAgendaItem(index, -1)}
+                            onClick={() => handleMoveAgendaItem(item.id, -1)}
+                            disabled={!canMoveAgendaItem(item.id, -1)}
                           >
                             ↑
                           </button>
                           <button
-                            onClick={() => handleMoveAgendaItem(index, 1)}
-                            disabled={!canMoveAgendaItem(index, 1)}
+                            onClick={() => handleMoveAgendaItem(item.id, 1)}
+                            disabled={!canMoveAgendaItem(item.id, 1)}
                           >
                             ↓
                           </button>
@@ -770,7 +783,7 @@ function App() {
                           value={item.duration}
                           onChange={(event) =>
                             handleStaticDurationChange(
-                              staticAgendaItem.id,
+                              item.id,
                               Number(event.target.value),
                             )
                           }
@@ -803,14 +816,14 @@ function App() {
                       </div>
                       <div className="move-controls">
                         <button
-                          onClick={() => handleMoveAgendaItem(index, -1)}
-                          disabled={!canMoveAgendaItem(index, -1)}
+                          onClick={() => handleMoveAgendaItem(item.id, -1)}
+                          disabled={!canMoveAgendaItem(item.id, -1)}
                         >
                           ↑
                         </button>
                         <button
-                          onClick={() => handleMoveAgendaItem(index, 1)}
-                          disabled={!canMoveAgendaItem(index, 1)}
+                          onClick={() => handleMoveAgendaItem(item.id, 1)}
+                          disabled={!canMoveAgendaItem(item.id, 1)}
                         >
                           ↓
                         </button>
