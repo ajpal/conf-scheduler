@@ -153,6 +153,10 @@ function App() {
         : 0),
     0,
   );
+  const totalBufferMinutes = schedule.reduce(
+    (total, item) => total + item.bufferBefore,
+    0,
+  );
 
   useEffect(() => {
     const nextState: PersistedState = {
@@ -382,7 +386,7 @@ function App() {
                   id: `slot-${crypto.randomUUID()}`,
                   proposalId: null,
                   talkDuration,
-                  qaDuration: 0,
+                  qaDuration: talkDuration === 5 ? 0 : 3,
                 },
               ],
             }
@@ -1152,6 +1156,7 @@ function App() {
             <Stat label="Talk minutes" value={`${totalTalkMinutes} min`} />
             <Stat label="Q&A minutes" value={`${totalQaMinutes} min`} />
             <Stat label="Transition minutes" value={`${totalTransitionMinutes} min`} />
+            <Stat label="Buffer minutes" value={`${totalBufferMinutes} min`} />
           </div>
 
           <div className="summary-callout">
