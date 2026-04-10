@@ -1,0 +1,385 @@
+:root {
+  font-family: "IBM Plex Sans", "Avenir Next", sans-serif;
+  color: #1e1d1b;
+  background:
+    radial-gradient(circle at top left, rgba(209, 109, 57, 0.18), transparent 35%),
+    radial-gradient(circle at top right, rgba(18, 107, 99, 0.18), transparent 30%),
+    linear-gradient(180deg, #f7f2e8 0%, #efe7d8 100%);
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 32px;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.eyebrow,
+.section-kicker,
+.item-tag {
+  margin: 0 0 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: #86563a;
+}
+
+.hero h1,
+.panel h2,
+.proposal-card h3,
+.timeline-card h3,
+.summary-callout h3,
+.unscheduled-card h4 {
+  margin: 0;
+  font-family: "Iowan Old Style", "Palatino Linotype", serif;
+  font-weight: 700;
+}
+
+.hero h1 {
+  font-size: clamp(2.6rem, 5vw, 4.4rem);
+  line-height: 0.98;
+  max-width: 12ch;
+}
+
+.hero-copy {
+  max-width: 56ch;
+  margin-top: 16px;
+  font-size: 1.02rem;
+  color: #42392f;
+}
+
+.hero-card,
+.panel,
+.stat-card,
+.proposal-card,
+.timeline-card,
+.summary-callout,
+.unscheduled-card {
+  border: 1px solid rgba(50, 43, 36, 0.12);
+  border-radius: 22px;
+  background: rgba(255, 251, 245, 0.82);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 20px 60px rgba(68, 55, 44, 0.08);
+}
+
+.hero-card {
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.1fr) minmax(380px, 1.4fr) minmax(280px, 0.9fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.panel {
+  padding: 20px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.search-input {
+  width: min(320px, 100%);
+}
+
+.proposal-form,
+.summary-callout,
+.unscheduled-list {
+  margin-bottom: 20px;
+}
+
+.import-row {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.file-input-label {
+  display: inline-grid;
+}
+
+.form-grid,
+.settings-row,
+.session-grid,
+.summary-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 12px;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: #574839;
+  font-size: 0.92rem;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(85, 68, 53, 0.18);
+  padding: 10px 12px;
+  background: rgba(255, 252, 247, 0.96);
+  color: #201d19;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.primary-button,
+.secondary-button,
+.move-controls button {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 14px;
+  transition:
+    transform 120ms ease,
+    background-color 120ms ease;
+}
+
+.primary-button {
+  background: #1d7668;
+  color: #f7f7f4;
+}
+
+.secondary-button,
+.move-controls button {
+  background: #ead9c3;
+  color: #443327;
+}
+
+.danger-button {
+  background: #f5d7cf;
+  color: #7f2f24;
+}
+
+.primary-button:hover,
+.secondary-button:hover,
+.move-controls button:hover {
+  transform: translateY(-1px);
+}
+
+.move-controls button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.proposal-list,
+.timeline,
+.unscheduled-list {
+  display: grid;
+  gap: 14px;
+}
+
+.proposal-card,
+.timeline-card,
+.unscheduled-card {
+  padding: 16px;
+}
+
+.proposal-meta,
+.timeline-heading,
+.session-footer,
+.unscheduled-card {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.duration-pill,
+.scheduled-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #efe5d7;
+  color: #6d4d39;
+  font-size: 0.84rem;
+}
+
+.scheduled-pill {
+  background: #d9efe8;
+  color: #1e6a5e;
+}
+
+.speaker-line,
+.abstract-copy,
+.timeline-card p,
+.summary-callout p,
+.stat-card span {
+  margin: 0;
+  color: #5e4f40;
+}
+
+.proposal-card h3,
+.timeline-card h3,
+.unscheduled-card h4 {
+  margin-top: 12px;
+  margin-bottom: 8px;
+}
+
+.settings-row,
+.summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.timeline {
+  position: relative;
+}
+
+.timeline::before {
+  content: "";
+  position: absolute;
+  left: 74px;
+  top: 12px;
+  bottom: 12px;
+  width: 2px;
+  background: linear-gradient(180deg, #d6b79a 0%, #b3d3cc 100%);
+}
+
+.timeline-card {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 18px;
+}
+
+.time-column {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+}
+
+.time-column strong {
+  font-size: 1rem;
+}
+
+.time-column span {
+  color: #726456;
+  font-size: 0.85rem;
+}
+
+.timeline-body {
+  display: grid;
+  gap: 14px;
+}
+
+.inline-field {
+  max-width: 140px;
+}
+
+.move-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.session-grid {
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+}
+
+.session-footer {
+  align-items: center;
+}
+
+.stat-card {
+  padding: 14px 16px;
+  display: grid;
+  gap: 4px;
+}
+
+.stat-card strong {
+  font-size: 1.2rem;
+}
+
+.stat-card.warning {
+  background: rgba(255, 240, 233, 0.95);
+}
+
+.stat-card.ok {
+  background: rgba(235, 247, 242, 0.95);
+}
+
+@media (max-width: 1180px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .hero {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    padding: 16px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .timeline-card {
+    grid-template-columns: 1fr;
+  }
+
+  .timeline::before {
+    display: none;
+  }
+}
