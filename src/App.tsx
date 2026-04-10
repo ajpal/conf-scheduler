@@ -1,6 +1,11 @@
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { proposalsFromCsv } from './csv';
-import { sampleAgenda, sampleProposals, sampleSessions } from './sampleData';
+import {
+  createDefaultScheduleState,
+  sampleAgenda,
+  sampleProposals,
+  sampleSessions,
+} from './sampleData';
 import {
   buildSchedule,
   formatTime,
@@ -252,6 +257,24 @@ function App() {
     setAgenda(nextAgenda);
   }
 
+  function handleAddBreak() {
+    const breakItem: AgendaItem = {
+      id: `block-break-${crypto.randomUUID()}`,
+      type: 'static',
+      kind: 'break',
+      title: 'Break',
+      duration: 15,
+    };
+
+    const wrapUpIndex = agenda.findIndex(
+      (item) => item.type === 'static' && item.kind === 'wrapUp',
+    );
+    const insertIndex = wrapUpIndex >= 0 ? wrapUpIndex : agenda.length;
+    const nextAgenda = [...agenda];
+    nextAgenda.splice(insertIndex, 0, breakItem);
+    setAgenda(nextAgenda);
+  }
+
   function handleAssignProposal(
     sessionGroupId: string,
     slotId: string,
@@ -440,11 +463,18 @@ function App() {
 
   function handleResetDemo() {
     setProposals(sampleProposals);
-    setSessionGroups(sampleSessions);
-    setAgenda(sampleAgenda);
+    const defaultScheduleState = createDefaultScheduleState();
+    setSessionGroups(defaultScheduleState.sessionGroups);
+    setAgenda(defaultScheduleState.agenda);
     setTargetEnd(TARGET_END);
     setSessionForm(initialSessionForm);
     setProposalForm(initialProposalForm);
+  }
+
+  function handleResetDefaultSchedule() {
+    const defaultScheduleState = createDefaultScheduleState();
+    setSessionGroups(defaultScheduleState.sessionGroups);
+    setAgenda(defaultScheduleState.agenda);
   }
 
   function handleTargetEndChange(event: ChangeEvent<HTMLInputElement>) {
@@ -742,6 +772,15 @@ function App() {
             <button className="primary-button" onClick={handleAddSessionGroup}>
               Add session
             </button>
+            <button className="secondary-button break-button" onClick={handleAddBreak}>
+              Add 15-minute break
+            </button>
+            <button
+              className="secondary-button break-button"
+              onClick={handleResetDefaultSchedule}
+            >
+              Reset to conference default
+            </button>
           </div>
 
           <div className="timeline">
@@ -873,16 +912,22 @@ function App() {
                         const proposal = slot.proposalId
                           ? proposalsById.get(slot.proposalId) ?? null
                           : null;
+                        const slotLengthLabel = getSlotLengthLabel(slot.talkDuration);
 
                         return (
-                          <div className="nested-slot-card" key={slot.id}>
+                          <div
+                            className={`nested-slot-card ${getSlotLengthClass(
+                              slot.talkDuration,
+                            )}`}
+                            key={slot.id}
+                          >
                             <div className="nested-slot-time">
                               <strong>{formatTime(slotStart)}</strong>
                               <span>{formatTime(slotEnd)}</span>
                             </div>
                             <div className="nested-slot-body">
                               <label className="assignment-field">
-                                Proposal
+                                {slotLengthLabel}
                                 <select
                                   value={slot.proposalId ?? ''}
                                   onChange={(event) =>
@@ -1051,6 +1096,30 @@ function Stat({ label, value, tone }: StatProps) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function getSlotLengthLabel(talkDuration: number): 'Short' | 'Medium' | 'Long' {
+  if (talkDuration <= 5) {
+    return 'Short';
+  }
+
+  if (talkDuration <= 10) {
+    return 'Medium';
+  }
+
+  return 'Long';
+}
+
+function getSlotLengthClass(talkDuration: number): string {
+  if (talkDuration <= 5) {
+    return 'slot-short';
+  }
+
+  if (talkDuration <= 10) {
+    return 'slot-medium';
+  }
+
+  return 'slot-long';
 }
 
 export default App;

@@ -23,7 +23,7 @@ export type SessionGroup = {
   slots: SessionSlot[];
 };
 
-export type StaticBlockKind = 'breakfast' | 'opening' | 'lunch' | 'wrapUp';
+export type StaticBlockKind = 'breakfast' | 'opening' | 'lunch' | 'wrapUp' | 'break';
 
 export type StaticAgendaItem = {
   id: string;

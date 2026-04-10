@@ -147,6 +147,10 @@ button {
   margin-bottom: 12px;
 }
 
+.break-button {
+  margin-left: 10px;
+}
+
 .import-row {
   margin-top: 12px;
   display: flex;
@@ -393,6 +397,21 @@ textarea {
   border: 1px solid rgba(85, 68, 53, 0.1);
 }
 
+.nested-slot-card.slot-short {
+  background: rgba(230, 244, 233, 0.98);
+  border-color: rgba(73, 123, 80, 0.24);
+}
+
+.nested-slot-card.slot-medium {
+  background: rgba(251, 243, 205, 0.98);
+  border-color: rgba(173, 139, 44, 0.24);
+}
+
+.nested-slot-card.slot-long {
+  background: rgba(248, 226, 204, 0.98);
+  border-color: rgba(183, 108, 43, 0.24);
+}
+
 .nested-slot-time {
   display: grid;
   gap: 4px;
@@ -463,5 +482,10 @@ textarea {
   .nested-slot-card,
   .session-group-controls {
     grid-template-columns: 1fr;
+  }
+
+  .break-button {
+    margin-left: 0;
+    margin-top: 10px;
   }
 }
