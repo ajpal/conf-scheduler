@@ -157,6 +157,24 @@ function App() {
     (total, item) => total + item.bufferBefore,
     0,
   );
+  const shortTalkCount = sessionGroups.reduce(
+    (total, sessionGroup) =>
+      total + sessionGroup.slots.filter((slot) => slot.talkDuration <= 5).length,
+    0,
+  );
+  const mediumTalkCount = sessionGroups.reduce(
+    (total, sessionGroup) =>
+      total +
+      sessionGroup.slots.filter(
+        (slot) => slot.talkDuration > 5 && slot.talkDuration <= 10,
+      ).length,
+    0,
+  );
+  const longTalkCount = sessionGroups.reduce(
+    (total, sessionGroup) =>
+      total + sessionGroup.slots.filter((slot) => slot.talkDuration > 10).length,
+    0,
+  );
 
   useEffect(() => {
     const nextState: PersistedState = {
@@ -570,28 +588,6 @@ function App() {
 
   return (
     <div className="app-shell">
-      <header className="hero">
-        <div>
-          <p className="eyebrow">Single-track conference planner</p>
-          <h1>Compose sessions first, then assign talks into them.</h1>
-          <p className="hero-copy">
-            Define a session shape like one long talk and two short talks, tune shared
-            transitions, and fill each blank slot from the proposal pool.
-          </p>
-        </div>
-        <div className="hero-card">
-          <Stat label="Projected end" value={formatTime(projectedEnd)} />
-          <Stat label="Target end" value={formatTime(targetEnd)} />
-          <Stat
-            label="Status"
-            value={
-              overflow > 0 ? `${overflow} min over` : `${Math.abs(overflow)} min remaining`
-            }
-            tone={overflow > 0 ? 'warning' : 'ok'}
-          />
-        </div>
-      </header>
-
       <main className="layout">
         <section className="panel proposals-panel">
           <div className="panel-header">
@@ -1152,20 +1148,38 @@ function App() {
           </div>
 
           <div className="summary-grid">
-            <Stat label="Sessions" value={`${sessionGroups.length}`} />
-            <Stat label="Talk minutes" value={`${totalTalkMinutes} min`} />
-            <Stat label="Q&A minutes" value={`${totalQaMinutes} min`} />
-            <Stat label="Transition minutes" value={`${totalTransitionMinutes} min`} />
-            <Stat label="Buffer minutes" value={`${totalBufferMinutes} min`} />
-          </div>
-
-          <div className="summary-callout">
-            <h3>{overflow > 0 ? 'Day runs long' : 'Schedule fits target'}</h3>
-            <p>
-              {overflow > 0
-                ? `The current agenda ends ${overflow} minutes after the target end time.`
-                : `The current agenda ends ${Math.abs(overflow)} minutes before the target end time.`}
-            </p>
+            <SummaryBubble
+              rows={[{ label: 'Sessions', value: `${sessionGroups.length}` }]}
+            />
+            <SummaryBubble
+              rows={[
+                { label: 'Short Talks', value: `${shortTalkCount}` },
+                { label: 'Medium Talks', value: `${mediumTalkCount}` },
+                { label: 'Long Talks', value: `${longTalkCount}` },
+              ]}
+            />
+            <SummaryBubble
+              rows={[
+                { label: 'Talk Mins', value: `${totalTalkMinutes}` },
+                { label: 'Q&A Mins', value: `${totalQaMinutes}` },
+                { label: 'Transition Mins', value: `${totalTransitionMinutes}` },
+                { label: 'Buffer Mins', value: `${totalBufferMinutes}` },
+              ]}
+            />
+            <SummaryBubble
+              tone={overflow > 0 ? 'warning' : 'ok'}
+              rows={[
+                { label: 'Projected End', value: formatTime(projectedEnd) },
+                { label: 'Target End', value: formatTime(targetEnd) },
+                {
+                  label: 'Status',
+                  value:
+                    overflow > 0
+                      ? `${overflow} min over`
+                      : `${Math.abs(overflow)} min remaining`,
+                },
+              ]}
+            />
           </div>
 
           <div className="unscheduled-list">
@@ -1208,17 +1222,20 @@ function App() {
   );
 }
 
-type StatProps = {
-  label: string;
-  value: string;
+type SummaryBubbleProps = {
+  rows: Array<{ label: string; value: string }>;
   tone?: 'ok' | 'warning';
 };
 
-function Stat({ label, value, tone }: StatProps) {
+function SummaryBubble({ rows, tone }: SummaryBubbleProps) {
   return (
-    <div className={`stat-card ${tone ?? ''}`.trim()}>
-      <span>{label}</span>
-      <strong>{value}</strong>
+    <div className={`stat-card summary-bubble ${tone ?? ''}`.trim()}>
+      {rows.map((row) => (
+        <div className="summary-row" key={row.label}>
+          <span>{row.label}:</span>
+          <strong>{row.value}</strong>
+        </div>
+      ))}
     </div>
   );
 }
