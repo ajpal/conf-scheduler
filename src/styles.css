@@ -80,7 +80,7 @@ button {
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(320px, 1.1fr) minmax(380px, 1.4fr) minmax(280px, 0.9fr);
+  grid-template-columns: minmax(420px, 1.6fr) minmax(280px, 0.9fr);
   gap: 20px;
   align-items: start;
 }
@@ -113,10 +113,6 @@ button {
   inset: 0;
   opacity: 0;
   cursor: pointer;
-}
-
-.search-input {
-  width: min(320px, 100%);
 }
 
 .proposal-form,
@@ -159,6 +155,53 @@ button {
 
 .file-input-label {
   display: inline-grid;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(32, 29, 25, 0.42);
+  z-index: 10;
+}
+
+.modal-card {
+  width: min(720px, 100%);
+  padding: 20px;
+  border: 1px solid rgba(50, 43, 36, 0.12);
+  border-radius: 22px;
+  background: rgba(255, 251, 245, 0.98);
+  box-shadow: 0 20px 60px rgba(68, 55, 44, 0.18);
+}
+
+.modal-header,
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modal-header {
+  margin-bottom: 16px;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-family: "Iowan Old Style", "Palatino Linotype", serif;
+}
+
+.modal-actions {
+  margin-top: 16px;
+  justify-content: flex-end;
+}
+
+.form-error {
+  margin: 0 0 12px;
+  color: #9a3021;
+  font-size: 0.9rem;
 }
 
 .form-grid,

@@ -102,11 +102,12 @@ function App() {
   const [proposals, setProposals] = useState<TalkProposal[]>(initialState.proposals);
   const [sessionGroups, setSessionGroups] = useState<SessionGroup[]>(initialState.sessionGroups);
   const [agenda, setAgenda] = useState<AgendaItem[]>(initialState.agenda);
-  const [query, setQuery] = useState('');
   const [proposalForm, setProposalForm] = useState(initialProposalForm);
   const [sessionForm, setSessionForm] = useState(initialSessionForm);
   const [targetEnd, setTargetEnd] = useState(initialState.targetEnd);
   const [isScheduleViewOpen, setIsScheduleViewOpen] = useState(false);
+  const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
+  const [proposalError, setProposalError] = useState('');
 
   const schedule = useMemo(() => buildSchedule(agenda, sessionGroups), [agenda, sessionGroups]);
   const proposalsById = useMemo(
@@ -122,20 +123,6 @@ function App() {
     () => proposals.filter((proposal) => !scheduledProposalIds.has(proposal.id)),
     [proposals, scheduledProposalIds],
   );
-
-  const filteredProposals = useMemo(() => {
-    const trimmed = query.trim().toLowerCase();
-    if (!trimmed) {
-      return proposals;
-    }
-
-    return proposals.filter((proposal) =>
-      [proposal.speakerName, proposal.speakerAffiliation, proposal.title, proposal.abstract]
-        .join(' ')
-        .toLowerCase()
-        .includes(trimmed),
-    );
-  }, [proposals, query]);
 
   const projectedEnd = schedule.length > 0 ? schedule[schedule.length - 1].end : 9 * 60;
   const overflow = projectedEnd - targetEnd;
@@ -211,7 +198,8 @@ function App() {
     const title = proposalForm.title.trim();
     const abstract = proposalForm.abstract.trim();
 
-    if (!speakerName || !title || !abstract) {
+    if (!speakerName || !title) {
+      setProposalError('Speaker name and title are required.');
       return;
     }
 
@@ -229,6 +217,8 @@ function App() {
 
     setProposals((current) => [proposal, ...current]);
     setProposalForm(initialProposalForm);
+    setProposalError('');
+    setIsProposalModalOpen(false);
   }
 
   function buildSlotsFromTemplate(form: NewSessionTemplateForm): SessionSlot[] {
@@ -582,132 +572,6 @@ function App() {
   return (
     <div className="app-shell">
       <main className="layout">
-        <section className="panel proposals-panel">
-          <div className="panel-header">
-            <div>
-              <p className="section-kicker">Proposals</p>
-              <h2>Talk pool</h2>
-            </div>
-            <input
-              className="search-input"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search speakers, titles, abstracts"
-            />
-          </div>
-
-          <div className="proposal-form">
-            <h3>Add proposal</h3>
-            <div className="form-grid">
-              <label>
-                Speaker name
-                <input
-                  value={proposalForm.speakerName}
-                  onChange={(event) => updateProposalForm('speakerName', event.target.value)}
-                />
-              </label>
-              <label>
-                Affiliation
-                <input
-                  value={proposalForm.speakerAffiliation}
-                  onChange={(event) =>
-                    updateProposalForm('speakerAffiliation', event.target.value)
-                  }
-                />
-              </label>
-              <label className="wide">
-                Title
-                <input
-                  value={proposalForm.title}
-                  onChange={(event) => updateProposalForm('title', event.target.value)}
-                />
-              </label>
-              <label className="wide">
-                Abstract
-                <textarea
-                  rows={4}
-                  value={proposalForm.abstract}
-                  onChange={(event) => updateProposalForm('abstract', event.target.value)}
-                />
-              </label>
-              <label>
-                Preferred talk length
-                <select
-                  value={proposalForm.preferredTalkDuration}
-                  onChange={(event) =>
-                    updateProposalForm(
-                      'preferredTalkDuration',
-                      event.target.value as NewProposalForm['preferredTalkDuration'],
-                    )
-                  }
-                >
-                  <option value="5">5 minutes</option>
-                  <option value="10">10 minutes</option>
-                  <option value="15">15 minutes</option>
-                </select>
-              </label>
-            </div>
-            <button className="primary-button" onClick={handleAddProposal}>
-              Add proposal
-            </button>
-            <div className="import-row">
-              <label className="file-input-label">
-                Import CSV
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={handleImportProposals}
-                />
-              </label>
-              <button className="secondary-button" onClick={() => setProposals(bundledProposals)}>
-                Reload bundled CSV
-              </button>
-            </div>
-          </div>
-
-          <div className="proposal-list">
-            {filteredProposals.map((proposal) => {
-              const isScheduled = scheduledProposalIds.has(proposal.id);
-
-              return (
-                <article
-                  className={`proposal-card ${getSlotLengthClass(
-                    proposal.preferredTalkDuration,
-                  )}`}
-                  key={proposal.id}
-                >
-                  <div className="proposal-meta">
-                    <span className="duration-pill">
-                      {proposal.preferredTalkDuration} min preferred
-                    </span>
-                    {isScheduled ? (
-                      <span className="scheduled-pill">Assigned</span>
-                    ) : (
-                      <button
-                        className="secondary-button"
-                        onClick={() => handleAssignToOpenSlot(proposal)}
-                        disabled={
-                          !sessionGroups.some((sessionGroup) =>
-                            sessionGroup.slots.some((slot) => slot.proposalId === null),
-                          )
-                        }
-                      >
-                        Fill open slot
-                      </button>
-                    )}
-                  </div>
-                  <h3>{proposal.title}</h3>
-                  <p className="speaker-line">
-                    {proposal.speakerName}
-                    {proposal.speakerAffiliation ? `, ${proposal.speakerAffiliation}` : ''}
-                  </p>
-                  <p className="abstract-copy">{proposal.abstract}</p>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-
         <section className="panel agenda-panel">
           <div className="panel-header">
             <div>
@@ -715,6 +579,23 @@ function App() {
               <h2>Session-based timeline</h2>
             </div>
             <div className="panel-actions">
+              <label className="secondary-button file-button">
+                Import CSV
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={handleImportProposals}
+                />
+              </label>
+              <button
+                className="secondary-button"
+                onClick={() => {
+                  setProposalError('');
+                  setIsProposalModalOpen(true);
+                }}
+              >
+                Add Proposal
+              </button>
               <label className="secondary-button file-button">
                 Import Schedule
                 <input
@@ -1297,6 +1178,90 @@ function App() {
           </div>
         </section>
       </main>
+
+      {isProposalModalOpen ? (
+        <div className="modal-backdrop" onClick={() => setIsProposalModalOpen(false)}>
+          <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Add Proposal</h3>
+              <button
+                className="slot-remove-button"
+                onClick={() => {
+                  setProposalError('');
+                  setIsProposalModalOpen(false);
+                }}
+                aria-label="Close add proposal modal"
+              >
+                X
+              </button>
+            </div>
+            {proposalError ? <p className="form-error">{proposalError}</p> : null}
+            <div className="form-grid">
+              <label>
+                Speaker name
+                <input
+                  value={proposalForm.speakerName}
+                  onChange={(event) => updateProposalForm('speakerName', event.target.value)}
+                />
+              </label>
+              <label>
+                Affiliation
+                <input
+                  value={proposalForm.speakerAffiliation}
+                  onChange={(event) =>
+                    updateProposalForm('speakerAffiliation', event.target.value)
+                  }
+                />
+              </label>
+              <label className="wide">
+                Title
+                <input
+                  value={proposalForm.title}
+                  onChange={(event) => updateProposalForm('title', event.target.value)}
+                />
+              </label>
+              <label className="wide">
+                Abstract
+                <textarea
+                  rows={5}
+                  value={proposalForm.abstract}
+                  onChange={(event) => updateProposalForm('abstract', event.target.value)}
+                />
+              </label>
+              <label>
+                Preferred talk length
+                <select
+                  value={proposalForm.preferredTalkDuration}
+                  onChange={(event) =>
+                    updateProposalForm(
+                      'preferredTalkDuration',
+                      event.target.value as NewProposalForm['preferredTalkDuration'],
+                    )
+                  }
+                >
+                  <option value="5">5 minutes</option>
+                  <option value="10">10 minutes</option>
+                  <option value="15">15 minutes</option>
+                </select>
+              </label>
+            </div>
+            <div className="modal-actions">
+              <button
+                className="secondary-button"
+                onClick={() => {
+                  setProposalError('');
+                  setIsProposalModalOpen(false);
+                }}
+              >
+                Cancel
+              </button>
+              <button className="primary-button" onClick={handleAddProposal}>
+                Add proposal
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
