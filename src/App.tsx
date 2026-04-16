@@ -33,7 +33,7 @@ type NewProposalForm = {
 };
 
 type NewSessionTemplateForm = {
-  title: string;
+  sessionTitle: string;
   shortCount: number;
   mediumCount: number;
   longCount: number;
@@ -50,7 +50,7 @@ const initialProposalForm: NewProposalForm = {
 };
 
 const initialSessionForm: NewSessionTemplateForm = {
-  title: '',
+  sessionTitle: '',
   shortCount: 2,
   mediumCount: 0,
   longCount: 1,
@@ -131,6 +131,22 @@ function App() {
       total + sessionGroup.slots.filter((slot) => slot.talkDuration > 10).length,
     0,
   );
+
+  function getSessionLabel(sessionGroupId: string): string {
+    const sessionIndex = agenda
+      .filter((item): item is Extract<AgendaItem, { type: 'session' }> => item.type === 'session')
+      .findIndex((item) => item.sessionGroupId === sessionGroupId);
+    return `Session ${sessionIndex >= 0 ? sessionIndex + 1 : 1}`;
+  }
+
+  function getSessionDisplayTitle(sessionGroup: SessionGroup): string {
+    const sessionLabel = getSessionLabel(sessionGroup.id);
+    const sessionTitle = sessionGroup.sessionTitle.trim();
+    if (!sessionTitle) {
+      return sessionLabel;
+    }
+    return `${sessionLabel}: ${sessionTitle}`;
+  }
 
   function updateProposalForm<K extends keyof NewProposalForm>(
     key: K,
@@ -217,7 +233,8 @@ function App() {
     const agendaId = `agenda-${crypto.randomUUID()}`;
     const nextSessionGroup: SessionGroup = {
       id: sessionGroupId,
-      title: sessionForm.title.trim() || `Session ${sessionGroups.length + 1}`,
+      title: `Session ${sessionGroups.length + 1}`,
+      sessionTitle: sessionForm.sessionTitle.trim(),
       transitionDuration: sessionForm.transitionDuration,
       slots,
     };
@@ -304,7 +321,7 @@ function App() {
 
   function handleSessionGroupChange(
     sessionGroupId: string,
-    field: keyof Pick<SessionGroup, 'title' | 'transitionDuration'>,
+    field: keyof Pick<SessionGroup, 'sessionTitle' | 'transitionDuration'>,
     value: string | number,
   ) {
     setSessionGroups((current) =>
@@ -532,7 +549,7 @@ function App() {
           <tr>
             <td>${escapeHtml(formatTime(item.start))}</td>
             <td>${escapeHtml(formatTime(displayEnd))}</td>
-            <td>${escapeHtml(item.sessionGroup.title)}</td>
+            <td>${escapeHtml(getSessionDisplayTitle(item.sessionGroup))}</td>
             <td><div class="details">${details}</div></td>
           </tr>
         `;
@@ -748,7 +765,7 @@ function App() {
                       <tr key={item.id}>
                         <td>{formatTime(item.start)}</td>
                         <td>{formatTime(displayEnd)}</td>
-                        <td>{item.sessionGroup.title}</td>
+                        <td>{getSessionDisplayTitle(item.sessionGroup)}</td>
                         <td>
                           <div className="schedule-session-details">
                             {item.sessionGroup.slots.map((slot) => {
@@ -804,9 +821,11 @@ function App() {
                   <label className="wide">
                     Session title
                     <input
-                      value={sessionForm.title}
-                      onChange={(event) => updateSessionForm('title', event.target.value)}
-                      placeholder="Research Session B"
+                      value={sessionForm.sessionTitle}
+                      onChange={(event) =>
+                        updateSessionForm('sessionTitle', event.target.value)
+                      }
+                      placeholder="title"
                     />
                   </label>
                   <label>
@@ -944,7 +963,7 @@ function App() {
                 <div key={item.id}>
                   {item.bufferBefore > 0 ? (
                     <div className="buffer-note">
-                      Buffer: {item.bufferBefore} min before {item.sessionGroup.title}
+                      Buffer: {item.bufferBefore} min before {getSessionDisplayTitle(item.sessionGroup)}
                     </div>
                   ) : null}
                   <article className="timeline-card session-card">
@@ -956,7 +975,7 @@ function App() {
                       <div className="timeline-heading">
                         <div>
                           <p className="item-tag">Session</p>
-                          <h3>{item.sessionGroup.title}</h3>
+                          <h3>{getSessionDisplayTitle(item.sessionGroup)}</h3>
                           <p className="speaker-line">
                             {item.sessionGroup.slots.length} talks, {item.sessionGroup.transitionDuration}
                             {' '}min transition between talks
@@ -982,14 +1001,15 @@ function App() {
                         <label>
                           Session title
                           <input
-                            value={item.sessionGroup.title}
+                            value={item.sessionGroup.sessionTitle}
                             onChange={(event) =>
                               handleSessionGroupChange(
                                 item.sessionGroup.id,
-                                'title',
+                                'sessionTitle',
                                 event.target.value,
                               )
                             }
+                            placeholder="title"
                           />
                         </label>
                         <label className="inline-field">

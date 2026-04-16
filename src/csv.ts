@@ -276,6 +276,7 @@ type ScheduleCsvRow = {
   agendaId: string;
   sessionGroupId: string;
   title: string;
+  sessionTitle: string;
   kind: string;
   duration: number;
   fixedStart: string;
@@ -327,6 +328,11 @@ export function serializeScheduleToCsv(
   proposals: TalkProposal[],
   targetEnd: number,
 ): string {
+  const sessionLabelsById = new Map(
+    agenda
+      .filter((item): item is Extract<AgendaItem, { type: 'session' }> => item.type === 'session')
+      .map((item, index) => [item.sessionGroupId, `Session ${index + 1}`]),
+  );
   const sessionGroupsById = new Map(
     sessionGroups.map((sessionGroup) => [sessionGroup.id, sessionGroup]),
   );
@@ -336,6 +342,7 @@ export function serializeScheduleToCsv(
     'agendaId',
     'sessionGroupId',
     'title',
+    'sessionTitle',
     'kind',
     'duration',
     'fixedStart',
@@ -359,6 +366,7 @@ export function serializeScheduleToCsv(
         agendaId: item.id,
         sessionGroupId: '',
         title: item.title,
+        sessionTitle: '',
         kind: item.kind,
         duration: item.duration,
         fixedStart: item.fixedStart !== undefined ? String(item.fixedStart) : '',
@@ -386,7 +394,8 @@ export function serializeScheduleToCsv(
         rowType: 'session',
         agendaId: item.id,
         sessionGroupId: sessionGroup.id,
-        title: sessionGroup.title,
+        title: sessionLabelsById.get(sessionGroup.id) ?? sessionGroup.title,
+        sessionTitle: sessionGroup.sessionTitle,
         kind: '',
         duration: 0,
         fixedStart: '',
@@ -464,7 +473,8 @@ export function scheduleStateFromCsv(
       sessionGroupIndex.set(sessionGroupId, groupPosition);
       sessionGroups.push({
         id: sessionGroupId,
-        title: (record.title ?? '').trim() || `Session ${sessionGroups.length + 1}`,
+        title: `Session ${sessionGroups.length + 1}`,
+        sessionTitle: (record.sessionTitle ?? '').trim(),
         transitionDuration: Number(record.transitionDuration ?? 0) || 0,
         slots: [],
       });

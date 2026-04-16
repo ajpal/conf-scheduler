@@ -22,6 +22,7 @@ export function createDefaultScheduleState(): {
     {
       id: 'session-group-1',
       title: 'Session 1',
+      sessionTitle: '',
       transitionDuration: 2,
       slots: [
         createSlot('slot-1', 15, 3),
@@ -32,6 +33,7 @@ export function createDefaultScheduleState(): {
     {
       id: 'session-group-2',
       title: 'Session 2',
+      sessionTitle: '',
       transitionDuration: 2,
       slots: [
         createSlot('slot-4', 15, 3),
@@ -42,6 +44,7 @@ export function createDefaultScheduleState(): {
     {
       id: 'session-group-3',
       title: 'Session 3',
+      sessionTitle: '',
       transitionDuration: 2,
       slots: [
         createSlot('slot-7', 15, 3),
@@ -52,6 +55,7 @@ export function createDefaultScheduleState(): {
     {
       id: 'session-group-4',
       title: 'Session 4',
+      sessionTitle: '',
       transitionDuration: 2,
       slots: [
         createSlot('slot-10', 15, 3),
@@ -62,6 +66,7 @@ export function createDefaultScheduleState(): {
     {
       id: 'session-group-5',
       title: 'Session 5',
+      sessionTitle: '',
       transitionDuration: 1,
       slots: [
         createSlot('slot-13', 5, 1),

@@ -24,6 +24,7 @@ export type SessionSlot = {
 export type SessionGroup = {
   id: string;
   title: string;
+  sessionTitle: string;
   transitionDuration: number;
   slots: SessionSlot[];
 };
