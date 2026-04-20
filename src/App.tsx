@@ -665,6 +665,7 @@ function App() {
       .then((text) => {
         const imported = scheduleStateFromCsv(text, proposals);
         setAgenda(imported.agenda);
+        setProposals(imported.proposals);
         setSessionGroups(imported.sessionGroups);
         if (imported.targetEnd !== null) {
           setTargetEnd(imported.targetEnd);

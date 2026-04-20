@@ -17,14 +17,15 @@ const DURATION_COLUMNS = [
 ];
 
 export function parseCsv(text: string): string[][] {
+  const normalizedText = text.startsWith('\uFEFF') ? text.slice(1) : text;
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = '';
   let inQuotes = false;
 
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index];
-    const next = text[index + 1];
+  for (let index = 0; index < normalizedText.length; index += 1) {
+    const char = normalizedText[index];
+    const next = normalizedText[index + 1];
 
     if (char === '"') {
       if (inQuotes && next === '"') {
@@ -79,6 +80,13 @@ function rowsToRecords(rows: string[][]): CsvRecord[] {
     });
     return record;
   });
+}
+
+function requireHeaders(headers: string[], requiredHeaders: string[]): void {
+  const missingHeaders = requiredHeaders.filter((header) => !headers.includes(header));
+  if (missingHeaders.length > 0) {
+    throw new Error(`Missing required columns: ${missingHeaders.join(', ')}`);
+  }
 }
 
 function findHeader(headers: string[], matcher: (header: string) => boolean): string | undefined {
@@ -322,6 +330,49 @@ function matchProposal(
   return null;
 }
 
+function createDurationPreferences(
+  preferredTalkDuration: DurationMinutes,
+): DurationPreferenceMap {
+  return {
+    5: preferredTalkDuration === 5 ? 'top' : 'not_interested',
+    10: preferredTalkDuration === 10 ? 'top' : 'not_interested',
+    15: preferredTalkDuration === 15 ? 'top' : 'not_interested',
+  };
+}
+
+function getImportedTalkDuration(record: CsvRecord): DurationMinutes {
+  const talkDuration = Number(record.talkDuration ?? 10);
+  if (talkDuration <= 5) {
+    return 5;
+  }
+  if (talkDuration <= 10) {
+    return 10;
+  }
+  return 15;
+}
+
+function createFallbackProposal(record: CsvRecord): TalkProposal | null {
+  const proposalId = (record.proposalId ?? '').trim();
+  const title = (record.proposalTitle ?? '').trim();
+  const speakerName = (record.speakerName ?? '').trim();
+
+  if (!proposalId || !title || !speakerName) {
+    return null;
+  }
+
+  const preferredTalkDuration = getImportedTalkDuration(record);
+
+  return {
+    id: proposalId,
+    speakerName,
+    speakerAffiliation: '',
+    title,
+    abstract: '',
+    preferredTalkDuration,
+    durationPreferences: createDurationPreferences(preferredTalkDuration),
+  };
+}
+
 export function serializeScheduleToCsv(
   agenda: AgendaItem[],
   sessionGroups: SessionGroup[],
@@ -425,14 +476,26 @@ export function scheduleStateFromCsv(
   proposals: TalkProposal[],
 ): {
   agenda: AgendaItem[];
+  proposals: TalkProposal[];
   sessionGroups: SessionGroup[];
   targetEnd: number | null;
 } {
   const rows = parseCsv(text);
+  const headers = rows[0] ?? [];
+  requireHeaders(headers, [
+    'rowType',
+    'agendaId',
+    'sessionGroupId',
+    'kind',
+    'duration',
+    'talkDuration',
+    'qaDuration',
+  ]);
   const records = rowsToRecords(rows);
   const agenda: AgendaItem[] = [];
   const sessionGroups: SessionGroup[] = [];
   const sessionGroupIndex = new Map<string, number>();
+  const proposalsById = new Map(proposals.map((proposal) => [proposal.id, proposal]));
   let targetEnd: number | null = null;
 
   for (const record of records) {
@@ -486,13 +549,29 @@ export function scheduleStateFromCsv(
     }
 
     const matchedProposal = matchProposal(record, proposals);
+    const fallbackProposal =
+      matchedProposal === null ? createFallbackProposal(record) : null;
+
+    if (fallbackProposal && !proposalsById.has(fallbackProposal.id)) {
+      proposalsById.set(fallbackProposal.id, fallbackProposal);
+    }
+
     sessionGroups[groupPosition].slots.push({
       id: (record.slotId ?? '').trim() || `slot-${sessionGroups[groupPosition].slots.length + 1}`,
-      proposalId: matchedProposal?.id ?? null,
+      proposalId: matchedProposal?.id ?? fallbackProposal?.id ?? null,
       talkDuration: Number(record.talkDuration ?? 0) || 0,
       qaDuration: Number(record.qaDuration ?? 0) || 0,
     });
   }
 
-  return { agenda, sessionGroups, targetEnd };
+  if (agenda.length === 0) {
+    throw new Error('No schedule rows found.');
+  }
+
+  return {
+    agenda,
+    proposals: Array.from(proposalsById.values()),
+    sessionGroups,
+    targetEnd,
+  };
 }
