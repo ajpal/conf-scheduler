@@ -1,10 +1,11 @@
-import { ChangeEvent, useMemo, useState } from 'react';
+import { ChangeEvent, DragEvent, useMemo, useState } from 'react';
 import {
   proposalsFromCsv,
   scheduleStateFromCsv,
   serializeScheduleToCsv,
 } from './csv';
 import { createDefaultScheduleState } from './defaultSchedule';
+import { getDefaultQaDuration } from './sessionDefaults';
 import {
   buildSchedule,
   formatTime,
@@ -38,8 +39,23 @@ type NewSessionTemplateForm = {
   mediumCount: number;
   longCount: number;
   transitionDuration: number;
-  defaultQaDuration: number;
 };
+
+type SlotDragState = {
+  sessionGroupId: string;
+  slotId: string;
+};
+
+type SlotDropTarget = SlotDragState & {
+  position: 'before' | 'after';
+};
+
+type PendingProposalAssignment = {
+  sessionGroupId: string;
+  slotId: string;
+};
+
+const NEW_PROPOSAL_OPTION = '__new_proposal__';
 
 const initialProposalForm: NewProposalForm = {
   speakerName: '',
@@ -55,7 +71,6 @@ const initialSessionForm: NewSessionTemplateForm = {
   mediumCount: 0,
   longCount: 1,
   transitionDuration: 2,
-  defaultQaDuration: 0,
 };
 
 const defaultScheduleState = createDefaultScheduleState();
@@ -72,6 +87,10 @@ function App() {
   const [isScheduleViewOpen, setIsScheduleViewOpen] = useState(false);
   const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
   const [proposalError, setProposalError] = useState('');
+  const [draggedSlot, setDraggedSlot] = useState<SlotDragState | null>(null);
+  const [slotDropTarget, setSlotDropTarget] = useState<SlotDropTarget | null>(null);
+  const [pendingProposalAssignment, setPendingProposalAssignment] =
+    useState<PendingProposalAssignment | null>(null);
 
   const schedule = useMemo(() => buildSchedule(agenda, sessionGroups), [agenda, sessionGroups]);
   const proposalsById = useMemo(
@@ -162,6 +181,26 @@ function App() {
     setSessionForm((current) => ({ ...current, [key]: value }));
   }
 
+  function openProposalModal(
+    preferredTalkDuration: NewProposalForm['preferredTalkDuration'] = initialProposalForm.preferredTalkDuration,
+    assignmentTarget: PendingProposalAssignment | null = null,
+  ) {
+    setProposalForm({
+      ...initialProposalForm,
+      preferredTalkDuration,
+    });
+    setProposalError('');
+    setPendingProposalAssignment(assignmentTarget);
+    setIsProposalModalOpen(true);
+  }
+
+  function closeProposalModal() {
+    setProposalError('');
+    setProposalForm(initialProposalForm);
+    setPendingProposalAssignment(null);
+    setIsProposalModalOpen(false);
+  }
+
   function handleAddProposal() {
     const speakerName = proposalForm.speakerName.trim();
     const title = proposalForm.title.trim();
@@ -185,9 +224,14 @@ function App() {
     };
 
     setProposals((current) => [proposal, ...current]);
-    setProposalForm(initialProposalForm);
-    setProposalError('');
-    setIsProposalModalOpen(false);
+    if (pendingProposalAssignment) {
+      handleAssignProposal(
+        pendingProposalAssignment.sessionGroupId,
+        pendingProposalAssignment.slotId,
+        proposal.id,
+      );
+    }
+    closeProposalModal();
   }
 
   function buildSlotsFromTemplate(form: NewSessionTemplateForm): SessionSlot[] {
@@ -198,7 +242,7 @@ function App() {
         id: `slot-${crypto.randomUUID()}`,
         proposalId: null,
         talkDuration: 15,
-        qaDuration: form.defaultQaDuration,
+        qaDuration: getDefaultQaDuration(15),
       });
     }
 
@@ -207,7 +251,7 @@ function App() {
         id: `slot-${crypto.randomUUID()}`,
         proposalId: null,
         talkDuration: 10,
-        qaDuration: form.defaultQaDuration,
+        qaDuration: getDefaultQaDuration(10),
       });
     }
 
@@ -216,7 +260,7 @@ function App() {
         id: `slot-${crypto.randomUUID()}`,
         proposalId: null,
         talkDuration: 5,
-        qaDuration: form.defaultQaDuration,
+        qaDuration: getDefaultQaDuration(5),
       });
     }
 
@@ -309,6 +353,23 @@ function App() {
     );
   }
 
+  function handleProposalSelection(
+    sessionGroupId: string,
+    slotId: string,
+    talkDuration: number,
+    value: string,
+  ) {
+    if (value === NEW_PROPOSAL_OPTION) {
+      openProposalModal(String(talkDuration) as NewProposalForm['preferredTalkDuration'], {
+        sessionGroupId,
+        slotId,
+      });
+      return;
+    }
+
+    handleAssignProposal(sessionGroupId, slotId, value === '' ? null : value);
+  }
+
   function handleAssignToOpenSlot(proposal: TalkProposal) {
     for (const sessionGroup of sessionGroups) {
       const openSlot = sessionGroup.slots.find((slot) => slot.proposalId === null);
@@ -368,7 +429,7 @@ function App() {
                   id: `slot-${crypto.randomUUID()}`,
                   proposalId: null,
                   talkDuration,
-                  qaDuration: talkDuration === 5 ? 0 : 3,
+                  qaDuration: getDefaultQaDuration(talkDuration),
                 },
               ],
             }
@@ -390,6 +451,119 @@ function App() {
         };
       }),
     );
+  }
+
+  function handleReorderSlot(
+    sessionGroupId: string,
+    sourceSlotId: string,
+    targetSlotId: string,
+    position: 'before' | 'after',
+  ) {
+    if (sourceSlotId === targetSlotId) {
+      return;
+    }
+
+    setSessionGroups((current) =>
+      current.map((sessionGroup) => {
+        if (sessionGroup.id !== sessionGroupId) {
+          return sessionGroup;
+        }
+
+        const nextSlots = [...sessionGroup.slots];
+        const sourceIndex = nextSlots.findIndex((slot) => slot.id === sourceSlotId);
+        const targetIndex = nextSlots.findIndex((slot) => slot.id === targetSlotId);
+
+        if (sourceIndex < 0 || targetIndex < 0) {
+          return sessionGroup;
+        }
+
+        const [movedSlot] = nextSlots.splice(sourceIndex, 1);
+        const insertionIndex =
+          nextSlots.findIndex((slot) => slot.id === targetSlotId) +
+          (position === 'after' ? 1 : 0);
+
+        nextSlots.splice(insertionIndex, 0, movedSlot);
+
+        return {
+          ...sessionGroup,
+          slots: nextSlots,
+        };
+      }),
+    );
+  }
+
+  function handleSlotDragStart(
+    sessionGroupId: string,
+    slotId: string,
+    event: DragEvent<HTMLButtonElement>,
+  ) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', slotId);
+    setDraggedSlot({ sessionGroupId, slotId });
+    setSlotDropTarget(null);
+  }
+
+  function handleSlotDragOver(
+    sessionGroupId: string,
+    slotId: string,
+    event: DragEvent<HTMLDivElement>,
+  ) {
+    if (!draggedSlot || draggedSlot.sessionGroupId !== sessionGroupId) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const nextPosition =
+      event.clientY - bounds.top < bounds.height / 2 ? 'before' : 'after';
+
+    setSlotDropTarget((current) => {
+      if (
+        current &&
+        current.sessionGroupId === sessionGroupId &&
+        current.slotId === slotId &&
+        current.position === nextPosition
+      ) {
+        return current;
+      }
+
+      return {
+        sessionGroupId,
+        slotId,
+        position: nextPosition,
+      };
+    });
+  }
+
+  function handleSlotDrop(
+    sessionGroupId: string,
+    targetSlotId: string,
+    event: DragEvent<HTMLDivElement>,
+  ) {
+    event.preventDefault();
+
+    if (!draggedSlot || draggedSlot.sessionGroupId !== sessionGroupId) {
+      setSlotDropTarget(null);
+      return;
+    }
+
+    const position =
+      slotDropTarget &&
+      slotDropTarget.sessionGroupId === sessionGroupId &&
+      slotDropTarget.slotId === targetSlotId
+        ? slotDropTarget.position
+        : 'before';
+
+    handleReorderSlot(sessionGroupId, draggedSlot.slotId, targetSlotId, position);
+    setDraggedSlot(null);
+    setSlotDropTarget(null);
+  }
+
+  function handleSlotDragEnd() {
+    setDraggedSlot(null);
+    setSlotDropTarget(null);
   }
 
   function findAgendaIndex(itemId: string): number {
@@ -700,10 +874,7 @@ function App() {
               </label>
               <button
                 className="secondary-button"
-                onClick={() => {
-                  setProposalError('');
-                  setIsProposalModalOpen(true);
-                }}
+                onClick={() => openProposalModal()}
               >
                 Add Proposal
               </button>
@@ -870,17 +1041,6 @@ function App() {
                       value={sessionForm.transitionDuration}
                       onChange={(event) =>
                         updateSessionForm('transitionDuration', Number(event.target.value))
-                      }
-                    />
-                  </label>
-                  <label>
-                    Default Q&amp;A per talk
-                    <input
-                      type="number"
-                      min={0}
-                      value={sessionForm.defaultQaDuration}
-                      onChange={(event) =>
-                        updateSessionForm('defaultQaDuration', Number(event.target.value))
                       }
                     />
                   </label>
@@ -1058,10 +1218,27 @@ function App() {
 
                         return (
                           <div
-                            className={`nested-slot-card ${getSlotLengthClass(
-                              slot.talkDuration,
-                            )}`}
+                            className={[
+                              'nested-slot-card',
+                              getSlotLengthClass(slot.talkDuration),
+                              draggedSlot?.sessionGroupId === item.sessionGroup.id &&
+                              draggedSlot.slotId === slot.id
+                                ? 'is-dragging'
+                                : '',
+                              slotDropTarget?.sessionGroupId === item.sessionGroup.id &&
+                              slotDropTarget.slotId === slot.id
+                                ? `is-drop-target-${slotDropTarget.position}`
+                                : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' ')}
                             key={slot.id}
+                            onDragOver={(event) =>
+                              handleSlotDragOver(item.sessionGroup.id, slot.id, event)
+                            }
+                            onDrop={(event) =>
+                              handleSlotDrop(item.sessionGroup.id, slot.id, event)
+                            }
                           >
                             <div className="nested-slot-time">
                               <strong>{formatTime(slotStart)}</strong>
@@ -1069,19 +1246,33 @@ function App() {
                             </div>
                             <div className="nested-slot-body">
                               <div className="slot-header">
+                                <button
+                                  className="slot-drag-handle"
+                                  draggable
+                                  onDragStart={(event) =>
+                                    handleSlotDragStart(item.sessionGroup.id, slot.id, event)
+                                  }
+                                  onDragEnd={handleSlotDragEnd}
+                                  aria-label={`Drag to reorder ${slotLengthLabel.toLowerCase()} talk`}
+                                  title="Drag to reorder"
+                                >
+                                  ::
+                                </button>
                                 <label className="assignment-field">
                                   {slotLengthLabel}
                                   <select
                                     value={slot.proposalId ?? ''}
                                     onChange={(event) =>
-                                      handleAssignProposal(
+                                      handleProposalSelection(
                                         item.sessionGroup.id,
                                         slot.id,
-                                        event.target.value === '' ? null : event.target.value,
+                                        slot.talkDuration,
+                                        event.target.value,
                                       )
                                     }
                                   >
                                     <option value="">Unassigned</option>
+                                    <option value={NEW_PROPOSAL_OPTION}>Add new proposal...</option>
                                     {topPreferenceOptions.length > 0 ? (
                                       <optgroup label="Top Preference">
                                         {topPreferenceOptions.map((proposalOption) => {
@@ -1302,16 +1493,13 @@ function App() {
       </main>
 
       {isProposalModalOpen ? (
-        <div className="modal-backdrop" onClick={() => setIsProposalModalOpen(false)}>
+        <div className="modal-backdrop" onClick={closeProposalModal}>
           <div className="modal-card" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
               <h3>Add Proposal</h3>
               <button
                 className="slot-remove-button"
-                onClick={() => {
-                  setProposalError('');
-                  setIsProposalModalOpen(false);
-                }}
+                onClick={closeProposalModal}
                 aria-label="Close add proposal modal"
               >
                 X
@@ -1370,10 +1558,7 @@ function App() {
             <div className="modal-actions">
               <button
                 className="secondary-button"
-                onClick={() => {
-                  setProposalError('');
-                  setIsProposalModalOpen(false);
-                }}
+                onClick={closeProposalModal}
               >
                 Cancel
               </button>

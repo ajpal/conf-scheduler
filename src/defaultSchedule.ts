@@ -1,4 +1,5 @@
 import { AgendaItem, SessionGroup } from './types';
+import { getDefaultQaDuration } from './sessionDefaults';
 
 function createSlot(
   id: string,
@@ -25,9 +26,9 @@ export function createDefaultScheduleState(): {
       sessionTitle: '',
       transitionDuration: 2,
       slots: [
-        createSlot('slot-1', 15, 3),
-        createSlot('slot-2', 10, 3),
-        createSlot('slot-3', 10, 3),
+        createSlot('slot-1', 15, getDefaultQaDuration(15)),
+        createSlot('slot-2', 10, getDefaultQaDuration(10)),
+        createSlot('slot-3', 10, getDefaultQaDuration(10)),
       ],
     },
     {
@@ -36,9 +37,9 @@ export function createDefaultScheduleState(): {
       sessionTitle: '',
       transitionDuration: 2,
       slots: [
-        createSlot('slot-4', 15, 3),
-        createSlot('slot-5', 10, 3),
-        createSlot('slot-6', 10, 3),
+        createSlot('slot-4', 15, getDefaultQaDuration(15)),
+        createSlot('slot-5', 10, getDefaultQaDuration(10)),
+        createSlot('slot-6', 10, getDefaultQaDuration(10)),
       ],
     },
     {
@@ -47,9 +48,9 @@ export function createDefaultScheduleState(): {
       sessionTitle: '',
       transitionDuration: 2,
       slots: [
-        createSlot('slot-7', 15, 3),
-        createSlot('slot-8', 10, 3),
-        createSlot('slot-9', 10, 3),
+        createSlot('slot-7', 15, getDefaultQaDuration(15)),
+        createSlot('slot-8', 10, getDefaultQaDuration(10)),
+        createSlot('slot-9', 10, getDefaultQaDuration(10)),
       ],
     },
     {
@@ -58,9 +59,9 @@ export function createDefaultScheduleState(): {
       sessionTitle: '',
       transitionDuration: 2,
       slots: [
-        createSlot('slot-10', 15, 3),
-        createSlot('slot-11', 10, 3),
-        createSlot('slot-12', 10, 3),
+        createSlot('slot-10', 15, getDefaultQaDuration(15)),
+        createSlot('slot-11', 10, getDefaultQaDuration(10)),
+        createSlot('slot-12', 10, getDefaultQaDuration(10)),
       ],
     },
     {
@@ -69,12 +70,12 @@ export function createDefaultScheduleState(): {
       sessionTitle: '',
       transitionDuration: 1,
       slots: [
-        createSlot('slot-13', 5, 1),
-        createSlot('slot-14', 5, 1),
-        createSlot('slot-15', 5, 1),
-        createSlot('slot-16', 5, 1),
-        createSlot('slot-17', 5, 1),
-        createSlot('slot-18', 5, 1),
+        createSlot('slot-13', 5, getDefaultQaDuration(5)),
+        createSlot('slot-14', 5, getDefaultQaDuration(5)),
+        createSlot('slot-15', 5, getDefaultQaDuration(5)),
+        createSlot('slot-16', 5, getDefaultQaDuration(5)),
+        createSlot('slot-17', 5, getDefaultQaDuration(5)),
+        createSlot('slot-18', 5, getDefaultQaDuration(5)),
       ],
     },
   ];
